@@ -21,18 +21,7 @@ def patches(ind, nsideIN, nsideOUT):
     -------
 	ipix: list of int
 		Indices of all pixels contained with the parent patch(es).
-
-	References
-	----------
-	[1] G{\'o}rski, K. M., et al. 2005.
-	"HEALPix: A Framework for High-Resolution Discretization and Fast 
-	Analysis of Data Distributed on the Sphere." 
-	The Astrophysical Journal 622, 759.
-
-	History
-	-------
-	2020-03-02: First added to package.
-	2020-03-10: Docstring added.
+	
     """
     if nsideOUT/2 == nsideIN: # Base case
         ipix = []

@@ -24,23 +24,25 @@ class LensingEstimator():
 			The input CMB map in HEALPix format.
 		NSIDE_in: int
 			The NSIDE resolution of the input map.
+		map_dtheta: 1darray
+			The gradient of the input map with respect to theta in 
+			spherical coordinates.
+		map_dphi: 1darray
+			The gradient of the input map with respect to phi in 
+			spherical coordinates. The map is already divided by 
+			sin(theta).
 
-		History
-		-------
-		2020-03-10: First implementation.
 		"""
 		self.map_in = cmbmap
 		self.NSIDE_in = hp.npix2nside(self.map_in.size)
 
-	def EvaluateGradient(self):
+	def evaluate_gradient(self):
 		"""Evaluate the 2D gradient of the CMB map.
 		
 		Evaluate the 2D gradient of the original input map across 
-		the sky. 
+		the sky. This method uses the ``healpy`` function that returns 
+		d/dtheta and d/dphi/sin(theta).
 
-		History
-		-------
-		2020-03-10: First implementation.
 		"""
 		alm = hp.map2alm(self.map_in)
 		m, self.map_dtheta, self.map_dphi = hp.alm2map_der1(alm, self.NSIDE_in)
