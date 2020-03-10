@@ -11,6 +11,7 @@ Welcome to cmbpix's documentation!
    :caption: Contents:
 
    installation.rst
+   api.rst
 
 
 
