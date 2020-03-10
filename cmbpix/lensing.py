@@ -30,3 +30,13 @@ class LensingEstimator():
 		"""
 		self.map_in = cmbmap
 		self.NSIDE_in = hp.npix2nside(self.map_in.size)
+
+	def EvaluateGradient(self):
+		"""Evaluate the 2D gradient of the CMB map.
+		
+		Evaluate the 2D gradient of the original input map across 
+		the sky. 
+		"""
+		alm = hp.map2alm(self.map_in)
+		m, self.map_dtheta, self.map_dphi = hp.alm2map_der1(alm, self.NSIDE_in)
+		del m, alm
