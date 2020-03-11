@@ -4,30 +4,30 @@ from cmbpix.utils import *
 
 class LensingEstimator():
 	"""Estimator for small scale lensing in a full sky CMB map.
+
+	An object for reducing a HEALPix map of the cosmic microwave 
+	background in (mostly) pixel-space to estimate the effects 
+	of small angular scale weak lensing due to structure formation.
+
 	"""
 	def __init__(self, cmbmap):
-		"""Initiate the LensingEstimator object.
-
-		Create an object for reducting a HEALPix map of the cosmic 
-		microwave background in (mostly) pixel-space to estimate the 
-		effects of small angular scale weak lensing due to structure 
-		formation.
+		"""Initiate the estimator.
 
 		Parameters
 		----------
-		map: 1darray
+		cmbmap: 1darray
 			A CMB map in HEALPix format.
 
 		Attributes
 		----------
-		map_in: 1darray
+		map_in: 1d-array
 			The input CMB map in HEALPix format.
 		NSIDE_in: int
 			The NSIDE resolution of the input map.
-		map_dtheta: 1darray
+		map_dtheta: 1d-array
 			The gradient of the input map with respect to theta in 
 			spherical coordinates.
-		map_dphi: 1darray
+		map_dphi: 1d-array
 			The gradient of the input map with respect to phi in 
 			spherical coordinates. The map is already divided by 
 			sin(theta).
@@ -35,6 +35,8 @@ class LensingEstimator():
 		"""
 		self.map_in = cmbmap
 		self.NSIDE_in = hp.npix2nside(self.map_in.size)
+		self.map_dtheta = np.zeros(hp.nside2npix(self.NSIDE_in))
+		self.map_dphi = np.zeros(hp.nside2npix(self.NSIDE_in))
 
 	def evaluate_gradient(self):
 		"""Evaluate the 2D gradient of the CMB map.

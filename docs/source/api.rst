@@ -12,5 +12,6 @@ API reference
 ------------------
 
 .. autoclass:: cmbpix.lensing.estimator.LensingEstimator
+	:members: __init__
 
-.. automethod:: cmbpix.lensing.estimator.LensingEstimator.evaulate_gradient
+.. automethod:: cmbpix.lensing.estimator.LensingEstimator.evaluate_gradient

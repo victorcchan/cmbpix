@@ -12,6 +12,7 @@ Welcome to cmbpix's documentation!
 
    installation.rst
    api.rst
+   tutorial.ipynb
 
 
 
