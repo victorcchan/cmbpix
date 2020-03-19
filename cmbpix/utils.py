@@ -24,13 +24,13 @@ def patches(ind, nsideIN, nsideOUT):
 	
     """
     if nsideOUT/2 == nsideIN: # Base case
-        ipix = []
-        for i in np.arange(4) + 4*hp.ring2nest(nsideIN, ind):
-            ipix.append(hp.nest2ring(nsideOUT, i))
-        return ipix
+        return hp.nest2ring(nsideOUT, np.arange(4) + \
+                            4*hp.ring2nest(nsideIN, ind))
     else:
-        ipix = []
-        for i in np.arange(4) + 4*hp.ring2nest(nsideIN, ind):
-            ipix = ipix + patches(hp.nest2ring(nsideIN*2, i), nsideIN*2, \
-                                  nsideOUT)
-        return ipix
+        ipix = hp.nest2ring(nsideIN*2, np.arange(4) + \
+                            4*hp.ring2nest(nsideIN, ind))
+        return np.concatenate((patches(ipix[0], nsideIN*2, nsideOUT), 
+                                patches(ipix[1], nsideIN*2, nsideOUT), 
+                                patches(ipix[2], nsideIN*2, nsideOUT), 
+                                patches(ipix[3], nsideIN*2, nsideOUT), 
+                                ))
