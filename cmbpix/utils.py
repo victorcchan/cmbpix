@@ -1,7 +1,7 @@
 import numpy as np
 import healpy as hp
 
-def patches(ind, nsideIN, nsideOUT):
+def patches(ind, NSIDEin, NSIDEout):
     """Daughter pixel indices in a low resolution HEALPix patch.
 
     Return HEALPix indices for all pixels of a higher resolution map 
@@ -12,9 +12,9 @@ def patches(ind, nsideIN, nsideOUT):
     ----------
     ind: int or array of ints
     	Index of the parent HEALPix patch(es).
-    nsideIN: int
+    NSIDEin: int
     	NSIDE resolution of the parent HEALPix patch(es).
-    nsideOUT: int
+    MSIDEout: int
     	NSIDE resolution of the daughter HEALPix pixels.
 
     Returns
@@ -23,14 +23,14 @@ def patches(ind, nsideIN, nsideOUT):
 		Indices of all pixels contained with the parent patch(es).
 	
     """
-    if nsideOUT/2 == nsideIN: # Base case
-        return hp.nest2ring(nsideOUT, np.arange(4) + \
-                            4*hp.ring2nest(nsideIN, ind))
+    if NSIDEout/2 == NSIDEin: # Base case
+        return hp.nest2ring(NSIDEout, np.arange(4) + \
+                            4*hp.ring2nest(NSIDEin, ind))
     else:
-        ipix = hp.nest2ring(nsideIN*2, np.arange(4) + \
-                            4*hp.ring2nest(nsideIN, ind))
-        return np.concatenate((patches(ipix[0], nsideIN*2, nsideOUT), 
-                                patches(ipix[1], nsideIN*2, nsideOUT), 
-                                patches(ipix[2], nsideIN*2, nsideOUT), 
-                                patches(ipix[3], nsideIN*2, nsideOUT), 
+        ipix = hp.nest2ring(NSIDEin*2, np.arange(4) + \
+                            4*hp.ring2nest(NSIDEin, ind))
+        return np.concatenate((patches(ipix[0], NSIDEin*2, NSIDEout), 
+                                patches(ipix[1], NSIDEin*2, NSIDEout), 
+                                patches(ipix[2], NSIDEin*2, NSIDEout), 
+                                patches(ipix[3], NSIDEin*2, NSIDEout), 
                                 ))
