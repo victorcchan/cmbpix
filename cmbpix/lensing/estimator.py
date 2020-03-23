@@ -22,8 +22,6 @@ class LensingEstimator():
 		----------
 		map_in: 1d-array
 			The input CMB map in HEALPix format.
-		NSIDE_in: int
-			The NSIDE resolution of the input map.
 		map_dtheta: 1d-array
 			The gradient of the input map with respect to theta in 
 			spherical coordinates.
@@ -34,7 +32,8 @@ class LensingEstimator():
 
 		"""
 		self.map_in = cmbmap
-		self.NSIDE_in = hp.npix2nside(self.map_in.size)
+		self._NSIDE_small = hp.npix2nside(self.map_in.size)
+		self._NSIDE_large = 256
 		self.map_dtheta = np.zeros(hp.nside2npix(self.NSIDE_in))
 		self.map_dphi = np.zeros(hp.nside2npix(self.NSIDE_in))
 
