@@ -11,7 +11,7 @@ def test_estimator_init():
 	est = le.LensingEstimator(m)
 	assert np.all(est.map_in == m), \
 		"LensingEstimator does not keep input map"
-	assert est.NSIDE_in == 4, \
+	assert est._NSIDE_small == 4, \
 		"LensingEstimator does not infer map NSIDE corectly"
 
 def test_estimator_gradient():
