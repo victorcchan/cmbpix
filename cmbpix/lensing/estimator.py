@@ -24,18 +24,18 @@ class LensingEstimator():
 			The input CMB map in HEALPix format.
 		map_dtheta: 1d-array
 			The gradient of the input map with respect to theta in 
-			spherical coordinates.
+			spherical coordinates. Created after executing the method 
+			evaluate_gradient.
 		map_dphi: 1d-array
 			The gradient of the input map with respect to phi in 
 			spherical coordinates. The map is already divided by 
-			sin(theta).
+			sin(theta). Created after executing the method 
+			evaluate_gradient.
 
 		"""
 		self.map_in = cmbmap
 		self._NSIDE_small = hp.npix2nside(self.map_in.size)
 		self._NSIDE_large = 256
-		self.map_dtheta = np.zeros(hp.nside2npix(self.NSIDE_in))
-		self.map_dphi = np.zeros(hp.nside2npix(self.NSIDE_in))
 
 	def evaluate_gradient(self):
 		"""Evaluate the 2D gradient of the CMB map.
@@ -46,5 +46,5 @@ class LensingEstimator():
 
 		"""
 		alm = hp.map2alm(self.map_in)
-		m, self.map_dtheta, self.map_dphi = hp.alm2map_der1(alm, self.NSIDE_in)
+		m, self.map_dtheta, self.map_dphi = hp.alm2map_der1(alm, self._NSIDE_small)
 		del m, alm
