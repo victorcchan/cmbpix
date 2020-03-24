@@ -13,7 +13,7 @@ setuptools.setup(
 	description="Tools for pixel-based CMB analysis", 
     long_description=long_description, 
     long_description_content_type='text/markdown', 
-	packages=["cmbpix"], 
+	packages=["cmbpix, cmbpix.lensing"], 
 	python_requires=">=3", 
 	install_requires=["numpy", "healpy"], 
 )
