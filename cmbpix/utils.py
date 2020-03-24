@@ -1,12 +1,12 @@
 import numpy as np
 import healpy as hp
 
-def patches(ind, NSIDEin, NSIDEout):
+def patches(ind, NSIDEin, NSIDEout, nest=False):
     """Daughter pixel indices in a low resolution HEALPix patch.
 
     Return HEALPix indices for all pixels of a higher resolution map 
-    contained inside the pixel(s) of a lower resolution map. The input
-    indices must be in the RING ordering scheme.
+    contained inside the pixel(s) of a lower resolution map. Output pixels 
+    are always in the RING ordering scheme.
 
     Parameters
     ----------
@@ -14,25 +14,34 @@ def patches(ind, NSIDEin, NSIDEout):
     	Index of the parent HEALPix patch(es).
     NSIDEin: int
     	NSIDE resolution of the parent HEALPix patch(es).
-    MSIDEout: int
+    NSIDEout: int
     	NSIDE resolution of the daughter HEALPix pixels.
+    nest: bool, optional
+        If True, assume ``ind`` are given in NESTED pixel ordering. 
+        Otherwise, assume RING ordering. Default: False.
 
     Returns
     -------
 	ipix: list of int
-		Indices of all pixels contained with the parent patch(es).
+		Indices of all pixels contained with the parent patch(es). Output 
+        is always in RING ordering.
 	
     """
     if NSIDEout/2 == NSIDEin: # Base case
-        return hp.nest2ring(NSIDEout, np.arange(4) + \
-                            4*hp.ring2nest(NSIDEin, ind))
+        if nest:
+            return hp.nest2ring(NSIDEout, np.arange(4) + 4*ind)
+        else:
+            return hp.nest2ring(NSIDEout, np.arange(4) + \
+                                4*hp.ring2nest(NSIDEin, ind))
     else:
-        ipix = hp.nest2ring(NSIDEin*2, np.arange(4) + \
-                            4*hp.ring2nest(NSIDEin, ind))
-        return np.concatenate((patches(ipix[0], NSIDEin*2, NSIDEout), 
-                                patches(ipix[1], NSIDEin*2, NSIDEout), 
-                                patches(ipix[2], NSIDEin*2, NSIDEout), 
-                                patches(ipix[3], NSIDEin*2, NSIDEout), 
+        if nest:
+            ipix = np.arange(4) + 4*ind
+        else:
+            ipix = np.arange(4) + 4*hp.ring2nest(NSIDEin, ind)
+        return np.concatenate((patches(ipix[0], NSIDEin*2, NSIDEout, True), 
+                                patches(ipix[1], NSIDEin*2, NSIDEout, True), 
+                                patches(ipix[2], NSIDEin*2, NSIDEout, True), 
+                                patches(ipix[3], NSIDEin*2, NSIDEout, True), 
                                 ))
 
 def filter_map(map_in, fl):
