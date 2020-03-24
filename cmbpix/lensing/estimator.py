@@ -18,10 +18,15 @@ class LensingEstimator():
 		The fiducial power spectrum for the input CMB map.
 	h_ells: 2d-array
 		The boundaries used for high-passing the input CMB map.
+	lmax: int
+		The maximum ell that the estimator will consider for lensing.
 	w: float
 		The noise level of the input map in uK*rad.
 	beam: float
 		The FHWM of the map beam in rad.
+	Nl: 1d-array
+		The noise spectrum calcualted from ``w`` and ``beam`` using 
+		the Knox formula.
 	map_dtheta: 1d-array
 		The gradient of the input map with respect to theta in 
 		spherical coordinates. Created after executing the method 
@@ -42,7 +47,7 @@ class LensingEstimator():
 		the filter_all_maps method if map_dtheta exists.
 
 	"""
-	def __init__(self, cmbmap, fiducial_cls=None, lmax=6700, highell=3000, 
+	def __init__(self, cmbmap, fiducial_cls=None, lmax=6000, highell=3000, 
 					w=0., beam=0.):
 		"""Initiate the estimator.
 
@@ -52,36 +57,38 @@ class LensingEstimator():
 			A CMB map in HEALPix format.
 		fiducial_cls: 1d-array or None, optional
 			A set of fiducial Cls used for constructing Wiener filters. 
-			Should have entries for ell up to at least (3*NSIDE)-1.
+			Should have entries for ell up to at least (3*NSIDE)-1. 
+			If None, input map Cls are used. Default: None.
 		lmax: int, optional
-			The maximum ell the estimator will consider.
+			The maximum ell the estimator will consider. Default: 6000.
 		highell: int or array of ints, optional
 			Boundaries for high-pass filtering the input map. The 
 			generate_filters method uses these to create top hat-like 
 			Wiener filters using a sorted version this input as the 
 			boundaries. All entries must be smaller than lmax, which 
-			is assumed to be the largest boundary.
+			is assumed to be the largest boundary. Default: 3000.
 		w: float, optional
-			The noise level of the input map in uK*arcmin.
+			The noise level of the input map in uK*arcmin. Default: 0.
 		beam: float, optional
-			The FHWM size of the map beam in arcmin.
+			The FHWM size of the map beam in arcmin. Default: 0.
 
 		"""
 		self.map_in = cmbmap
 		self.cl_fid = fiducial_cls
 		self._NSIDE_small = hp.npix2nside(self.map_in.size)
 		self._NSIDE_large = 256 # Fixed
-		self.ells = np.arange(3*self._NSIDE_small-1)
+		self.ells = np.arange(3*self._NSIDE_small)
+		self.lmax = lmax
 
 		# Set up high-pass filter boundaries
 		if type(highell) == int:
-			self.h_ells = [[highell, 3*self._NSIDE_small-1]]
+			self.h_ells = [[highell, self.lmax]]
 		else:
 			self.h_ells = []
 			_ells = np.sort(highell)
 			for i in range(len(highell)):
 				if i == len(highell)-1:
-					self.h_ells.append([_ells[i], 3*self._NSIDE_small-1])
+					self.h_ells.append([_ells[i], self.lmax])
 				else:
 					self.h_ells.append([_ells[i], _ells[i+1]])
 			del _ells
@@ -134,7 +141,7 @@ class LensingEstimator():
 			Wl = (total_Cl - self.Nl) / total_Cl
 			del total_Cl
 		else:
-			fid = self.cl_fid[:3*self._NSIDE_small-1]
+			fid = self.cl_fid[:3*self._NSIDE_small]
 			Wl = fid / (fid + self.Nl)
 			del fid
 		T_filters = []
@@ -143,7 +150,7 @@ class LensingEstimator():
 			f[:ls[0]] = 0.
 			f[ls[1]:] = 0.
 			T_filters.append(f)
-		grad_filter = np.zeros(3*self._NSIDE_small-1)
+		grad_filter = np.zeros(3*self._NSIDE_small)
 		grad_filter[:2000] = 1.
 		return T_filters, grad_filter
 
