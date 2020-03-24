@@ -1,5 +1,6 @@
 import numpy as np
 import healpy as hp
+import pystan as stan
 from cmbpix.utils import *
 
 class LensingEstimator():
