@@ -16,7 +16,7 @@ class LensingEstimator():
 
 		Parameters
 		----------
-		cmbmap: 1darray
+		cmbmap: 1d-array
 			A CMB map in HEALPix format.
 		fiducial_cls: 1d-array or None, optional
 			A set of fiducial Cls used for constructing Wiener filters. 

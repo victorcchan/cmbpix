@@ -6,7 +6,7 @@ API reference
 ``cmbpix``
 ----------------
 
-.. autofunction:: cmbpix.patches
+.. autofunction:: cmbpix.utils.patches
 
 ``cmbpix.lensing``
 ------------------
