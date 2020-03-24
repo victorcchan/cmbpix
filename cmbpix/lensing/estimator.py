@@ -30,6 +30,15 @@ class LensingEstimator():
 		spherical coordinates. The map is already divided by 
 		sin(theta). Created after executing the method 
 		evaluate_gradient, otherwise initialized as None.
+	map_filtered: 2d-array
+		A collection of maps filtered according to the boundaries 
+		provided. Created after running the filter_all_maps method.
+	map_dtheta_f: 1d-array
+		A low-passed version of map_dtheta. Created after running 
+		the filter_all_maps method if map_dtheta exists.
+	map_dphi_f: 1d-array
+		A low-passed version of map_dphi. Created after running 
+		the filter_all_maps method if map_dtheta exists.
 
 	"""
 	def __init__(self, cmbmap, fiducial_cls=None, lmax=6700, highell=3000, 
@@ -114,6 +123,9 @@ class LensingEstimator():
 		T_filters: 2d-array
 			Top hat-like Wiener filters for every ell range given during 
 			initialization.
+		grad_filter: 1d-array
+			Top hat filter for low-passing the background gradient of the map 
+			for 0 < ell < 2000.
 
 		"""
 		if self.cl_fid is None: # Construct Wiener filter
@@ -140,9 +152,14 @@ class LensingEstimator():
 
 		Perform a high-pass Wiener filter on the input CMB map. The Wiener 
 		filter is constructed using the given fiducial Cls. If no fiducial 
-		model is given, then the Cls of the input map are used. If the 
-		gradient of the CMB map has already been taken, then this method 
-		also low-passes those maps for ell < 2000 unless filter_grad=False.
+		model is given, then the Cls of the input map are used.
+
+		Parameters
+		---------
+		filter_grad: bool, optional
+			If True, low-pass the background gradient of the input map for 
+			0 < ell < 2000. Only works if the evaluate_gradient method has 
+			already executed.
 
 		"""
 		T_filters, dT_filter = self.generate_filters()
@@ -160,4 +177,3 @@ class LensingEstimator():
 				self.map_dtphi_f = filter_map(self.map_dphi, dT_filter)
 			except TypeError:
 				print("Gradient not yet evaluated! Skipping filtering step.")
-				pass

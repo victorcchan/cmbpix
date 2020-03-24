@@ -22,7 +22,7 @@ def patches(ind, NSIDEin, NSIDEout, nest=False):
 
     Returns
     -------
-	ipix: list of int
+	ipix: 1d-array of int
 		Indices of all pixels contained with the parent patch(es). Output 
         is always in RING ordering.
 	
