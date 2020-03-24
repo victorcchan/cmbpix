@@ -9,6 +9,28 @@ class LensingEstimator():
 	background in (mostly) pixel-space to estimate the effects 
 	of small angular scale weak lensing due to structure formation.
 
+	Attributes
+	----------
+	map_in: 1d-array
+		The input CMB map in HEALPix format.
+	cl_fid: 1d-array
+		The fiducial power spectrum for the input CMB map.
+	h_ells: 2d-array
+		The boundaries used for high-passing the input CMB map.
+	w: float
+		The noise level of the input map in uK*rad.
+	beam: float
+		The FHWM of the map beam in rad.
+	map_dtheta: 1d-array
+		The gradient of the input map with respect to theta in 
+		spherical coordinates. Created after executing the method 
+		evaluate_gradient, otherwise initialized as None.
+	map_dphi: 1d-array
+		The gradient of the input map with respect to phi in 
+		spherical coordinates. The map is already divided by 
+		sin(theta). Created after executing the method 
+		evaluate_gradient, otherwise initialized as None.
+
 	"""
 	def __init__(self, cmbmap, fiducial_cls=None, lmax=6700, highell=3000, 
 					w=0., beam=0.):
@@ -33,28 +55,6 @@ class LensingEstimator():
 			The noise level of the input map in uK*arcmin.
 		beam: float, optional
 			The FHWM size of the map beam in arcmin.
-
-		Attributes
-		----------
-		map_in: 1d-array
-			The input CMB map in HEALPix format.
-		cl_fid: 1d-array
-			The fiducial power spectrum for the input CMB map.
-		h_ells: 2d-array
-			The boundaries used for high-passing the input CMB map.
-		w: float
-			The noise level of the input map in uK*rad.
-		beam: float
-			The FHWM of the map beam in rad.
-		map_dtheta: 1d-array
-			The gradient of the input map with respect to theta in 
-			spherical coordinates. Created after executing the method 
-			evaluate_gradient, otherwise initialized as None.
-		map_dphi: 1d-array
-			The gradient of the input map with respect to phi in 
-			spherical coordinates. The map is already divided by 
-			sin(theta). Created after executing the method 
-			evaluate_gradient, otherwise initialized as None.
 
 		"""
 		self.map_in = cmbmap
