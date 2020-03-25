@@ -2,6 +2,7 @@ import numpy as np
 import healpy as hp
 import pystan as stan
 from cmbpix.utils import *
+from cmbpix.lensing import prob_model as pm
 
 class LensingEstimator():
 	"""Estimator for small scale lensing in a full sky CMB map.
@@ -13,7 +14,8 @@ class LensingEstimator():
 	Attributes
 	----------
 	map_in: 1d-array
-		The input CMB map in HEALPix format. Assumed to be in RING ordering.
+		The input CMB map in HEALPix format. The resolution of the map 
+		must be of NSIDE > 256. Assumed to be in RING ordering.
 	cl_fid: 1d-array
 		The fiducial power spectrum for the input CMB map.
 	h_ells: 2d-array
@@ -176,11 +178,57 @@ class LensingEstimator():
 		if filter_grad:
 			try:
 				self.map_dtheta_f = filter_map(self.map_dtheta, dT_filter)
-				self.map_dtphi_f = filter_map(self.map_dphi, dT_filter)
+				self.map_dphi_f = filter_map(self.map_dphi, dT_filter)
 			except TypeError:
 				print("Gradient not yet evaluated! Skipping filtering step.")
 
 	def divide_patches(self):
+		"""Divide the sky map into patches larger than the pixel size.
+
+		Return the indices of the original resolution for the input map but 
+		reordered such that pixels are grouped together into larger patches 
+		on the sky --> A lower HEALPix resolution. The new ordering is NOT 
+		a standard HEALPix ordering scheme. Also return the corresponding 
+		index of the larger patch for each of the grouped.
+
+		Returns
+		-------
+		patch_order: 2d-array of int
+			The new ordering for the original, higher resolution map with 
+			pixels grouped together into larger patches. Entries at 
+			patch_order[i] contain [old_index, patch_index], where 
+			old_index is the original index of the i-th pixel in the RING 
+			ordering and patch_index is the index of its corresponding patch 
+			in the lower resolution.
+
 		"""
+		large_inds = np.arange(np.nside2npix(self._NSIDE_large), dtype=int)
+		small_inds = patches(large_inds, self._NSIDE_large, self._NSIDE_small)
+		large_inds = large_inds.repeat(hp.nside2npix(self._NSIDE_small) // \
+										hp.nside2npix(self._NSIDE_large))
+		self.patch_order = np.stack((large_inds, small_inds), axis=1)
+
+	def calculate_patch_statistics(self):
+		"""Determine the statistics for the lensing estimator within patches.
+
+		Compute the required statistics for the probabilistic lensing 
+		estimator within large patches of the sky. Specifically, the means of 
+		the filtered, input map, and each gradient map are computed within 
+		each patch. A copy of the input map is also re-ordered to group 
+		pixels into their corresponding larger patches.
 		"""
-		small_inds = np.arange(np.nside2npix(self._NSIDE_small))
+		n_small = hp.nside2npix(self._NSIDE_small)
+		n_large = hp.nside2npix(self._NSIDE_large)
+		groups = (n_large, n_small//n_large) # For reshaping into patches
+
+		# Take mean of filtered, input map in each patch
+		self.map_reordered = self.map_filtered[self.patch_order[:,0]]
+		self.map_mean = np.mean(np.reshape(self.map_reordered, groups),axis=1)
+
+		# Take mean of filtered dtheta map in each patch
+		dtheta_reordered = self.map_dtheta_f[self.patch_order[:,0]]
+		self.dtheta_mean = np.mean(np.reshape(dtheta_reordered, groups),axis=1)
+
+		# Take mean of filtered dphi map in each patch
+		dphi_reordered = self.map_dphi_f[self.patch_order[:,0]]
+		self.dphi_mean = np.mean(np.reshape(dphi_reordered, groups),axis=1)
