@@ -28,16 +28,20 @@ def patches(ind, NSIDEin, NSIDEout, nest=False):
 	
     """
     if NSIDEout/2 == NSIDEin: # Base case
+        inds = np.array(ind)
         if nest:
-            return hp.nest2ring(NSIDEout, np.arange(4) + 4*ind)
+            return hp.nest2ring(NSIDEout, np.tile(np.arange(4), inds.size) + \
+                4*inds.repeat(4))
         else:
-            return hp.nest2ring(NSIDEout, np.arange(4) + \
-                                4*hp.ring2nest(NSIDEin, ind))
+            return hp.nest2ring(NSIDEout, np.tile(np.arange(4), inds.size) + \
+                                4*hp.ring2nest(NSIDEin, inds.repeat(4)))
     else:
+        inds = np.array(ind)
         if nest:
-            ipix = np.arange(4) + 4*ind
+            ipix = np.tile(np.arange(4), inds.size) + 4*inds.repeat(4)
         else:
-            ipix = np.arange(4) + 4*hp.ring2nest(NSIDEin, ind)
+            ipix = np.tile(np.arange(4), inds.size) + \
+                4*hp.ring2nest(NSIDEin, inds.repeat(4))
         return np.concatenate((patches(ipix[0], NSIDEin*2, NSIDEout, True), 
                                 patches(ipix[1], NSIDEin*2, NSIDEout, True), 
                                 patches(ipix[2], NSIDEin*2, NSIDEout, True), 
