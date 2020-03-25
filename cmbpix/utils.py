@@ -34,18 +34,22 @@ def patches(ind, NSIDEin, NSIDEout, nest=False):
                 4*inds.repeat(4))
         else:
             return hp.nest2ring(NSIDEout, np.tile(np.arange(4), inds.size) + \
-                                4*hp.ring2nest(NSIDEin, inds.repeat(4)))
+                                4*hp.ring2nest(NSIDEin, inds).repeat(4))
     else:
         inds = np.array(ind)
+        s = inds.size
         if nest:
-            ipix = np.tile(np.arange(4), inds.size) + 4*inds.repeat(4)
+            ipix = np.tile(np.arange(4), s) + 4*inds.repeat(4)
         else:
-            ipix = np.tile(np.arange(4), inds.size) + \
-                4*hp.ring2nest(NSIDEin, inds.repeat(4))
-        return np.concatenate((patches(ipix[0], NSIDEin*2, NSIDEout, True), 
-                                patches(ipix[1], NSIDEin*2, NSIDEout, True), 
-                                patches(ipix[2], NSIDEin*2, NSIDEout, True), 
-                                patches(ipix[3], NSIDEin*2, NSIDEout, True), 
+            ipix = np.tile(np.arange(4), s) + \
+                4*hp.ring2nest(NSIDEin, inds).repeat(4)
+        return np.concatenate((patches(ipix[:s], NSIDEin*2, NSIDEout, True), 
+                                patches(ipix[s:2*s], NSIDEin*2, \
+                                    NSIDEout, True), 
+                                patches(ipix[2*s:3*s], NSIDEin*2, \
+                                    NSIDEout, True), 
+                                patches(ipix[3*s:], NSIDEin*2, \
+                                    NSIDEout, True), 
                                 ))
 
 def filter_map(map_in, fl):
