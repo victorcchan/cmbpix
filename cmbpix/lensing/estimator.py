@@ -13,17 +13,11 @@ class LensingEstimator():
 	Attributes
 	----------
 	map_in: 1d-array
-		The input CMB map in HEALPix format.
+		The input CMB map in HEALPix format. Assumed to be in RING ordering.
 	cl_fid: 1d-array
 		The fiducial power spectrum for the input CMB map.
 	h_ells: 2d-array
 		The boundaries used for high-passing the input CMB map.
-	lmax: int
-		The maximum ell that the estimator will consider for lensing.
-	w: float
-		The noise level of the input map in uK*rad.
-	beam: float
-		The FHWM of the map beam in rad.
 	Nl: 1d-array
 		The noise spectrum calcualted from ``w`` and ``beam`` using 
 		the Knox formula.
@@ -78,26 +72,26 @@ class LensingEstimator():
 		self._NSIDE_small = hp.npix2nside(self.map_in.size)
 		self._NSIDE_large = 256 # Fixed
 		self.ells = np.arange(3*self._NSIDE_small)
-		self.lmax = lmax
+		self._lmax = lmax
 
 		# Set up high-pass filter boundaries
 		if type(highell) == int:
-			self.h_ells = [[highell, self.lmax]]
+			self.h_ells = [[highell, self._lmax]]
 		else:
 			self.h_ells = []
 			_ells = np.sort(highell)
 			for i in range(len(highell)):
 				if i == len(highell)-1:
-					self.h_ells.append([_ells[i], self.lmax])
+					self.h_ells.append([_ells[i], self._lmax])
 				else:
 					self.h_ells.append([_ells[i], _ells[i+1]])
 			del _ells
 
 		# Generate a noise spectrum for Wiener filtering purposes
-		self.w = w * np.pi / 10800. # Convert to uK*rad
-		self.beam = beam * np.pi / 10800. # Convert to rad
-		wl = np.exp(-self.ells*(self.ells+1)*self.beam**2)
-		self.Nl = self.w**2 / wl # Knox formula
+		self._w = w * np.pi / 10800. # Convert to uK*rad
+		self._beam = beam * np.pi / 10800. # Convert to rad
+		wl = np.exp(-self.ells*(self.ells+1)*self._beam**2)
+		self.Nl = self._w**2 / wl # Knox formula
 		self.Nl[:2] = 1e-9 # Prevent divide by zero (Values not used anyway)
 		del wl
 
@@ -185,3 +179,8 @@ class LensingEstimator():
 				self.map_dtphi_f = filter_map(self.map_dphi, dT_filter)
 			except TypeError:
 				print("Gradient not yet evaluated! Skipping filtering step.")
+
+	def divide_patches(self):
+		"""
+		"""
+		small_inds = np.arange(np.nside2npix(self._NSIDE_small))
