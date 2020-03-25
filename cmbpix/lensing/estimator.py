@@ -214,7 +214,7 @@ class LensingEstimator():
 		Compute the required statistics for the probabilistic lensing 
 		estimator within large patches of the sky. Specifically, the means of 
 		the filtered, input map, and each gradient map are computed within 
-		each patch. A copy of the input map is also re-ordered to group 
+		each patch. A copy of the input map is also re-ordered to group its 
 		pixels into their corresponding larger patches.
 		"""
 		n_small = hp.nside2npix(self._NSIDE_small)
@@ -232,3 +232,34 @@ class LensingEstimator():
 		# Take mean of filtered dphi map in each patch
 		dphi_reordered = self.map_dphi_f[self.patch_order[:,0]]
 		self.dphi_mean = np.mean(np.reshape(dphi_reordered, groups),axis=1)
+
+	def sample_model(self, steps=1000, nchains=4):
+		"""Create a StanModel and sample for the relevant lensing parameters.
+
+		Sample the estimator model using the products of processing the 
+		input map as parameters. Creates the attribute ``self.fit``, which 
+		is a dictionary containing the chains for each parameter.
+		"""
+		self.model = pm.build_lens_model()
+		data = {
+			"N" : hp.nside2npix(self._NSIDE_large), 
+			"M" : hp.nside2npix(self._NSIDE_small), 
+			"T" : self.map_reordered, 
+			"T_mean" : self.map_mean, 
+			"dTx" : self.dtheta_mean, 
+			"dTy" : self.dphi_mean, 
+			"ii" : self.patch_order[:,1], 
+		}
+		init_guess = []
+		dPsix_guess = self.map_mean / self.dtheta_mean
+		dPsiy_guess = self.map_mean / self.dphi_mean
+		start = {
+			"dPsix" : dPsix_guess, 
+			"dPsiy" : dPsiy_guess,
+			"dPsix_total" : np.std(dPsix_guess), 
+			"dPsiy_total" : np.std(dPsiy_guess, 
+		}
+		for i in range(nchains):
+			init.append(start)
+		self.fit = self.model.sampling(data, chains=nchains, iter=steps, \
+			init=init_guess)
