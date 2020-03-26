@@ -257,7 +257,7 @@ class LensingEstimator():
 			"dPsix" : dPsix_guess, 
 			"dPsiy" : dPsiy_guess,
 			"dPsix_total" : np.std(dPsix_guess), 
-			"dPsiy_total" : np.std(dPsiy_guess, 
+			"dPsiy_total" : np.std(dPsiy_guess), 
 		}
 		for i in range(nchains):
 			init.append(start)
