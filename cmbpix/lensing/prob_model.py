@@ -51,6 +51,7 @@ def build_lens_model():
 	-------
 	lens_model: StanModel object
 		A StanModel object for the pixel-space CMB lensing estimator.
+		
 	"""
 	lens_model = StanModel(model_code=lens_code)
 	return lens_model

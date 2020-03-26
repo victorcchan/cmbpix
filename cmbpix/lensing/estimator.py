@@ -216,6 +216,7 @@ class LensingEstimator():
 		the filtered, input map, and each gradient map are computed within 
 		each patch. A copy of the input map is also re-ordered to group its 
 		pixels into their corresponding larger patches.
+
 		"""
 		n_small = hp.nside2npix(self._NSIDE_small)
 		n_large = hp.nside2npix(self._NSIDE_large)
@@ -228,10 +229,12 @@ class LensingEstimator():
 		# Take mean of filtered dtheta map in each patch
 		dtheta_reordered = self.map_dtheta_f[self.patch_order[:,0]]
 		self.dtheta_mean = np.mean(np.reshape(dtheta_reordered, groups),axis=1)
+		del dtheta_reordered
 
 		# Take mean of filtered dphi map in each patch
 		dphi_reordered = self.map_dphi_f[self.patch_order[:,0]]
 		self.dphi_mean = np.mean(np.reshape(dphi_reordered, groups),axis=1)
+		del dphi_reordered
 
 	def sample_model(self, steps=1000, nchains=4):
 		"""Create a StanModel and sample for the relevant lensing parameters.
@@ -239,6 +242,7 @@ class LensingEstimator():
 		Sample the estimator model using the products of processing the 
 		input map as parameters. Creates the attribute ``self.fit``, which 
 		is a dictionary containing the chains for each parameter.
+
 		"""
 		self.model = pm.build_lens_model()
 		data = {
