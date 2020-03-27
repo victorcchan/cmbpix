@@ -223,8 +223,12 @@ class LensingEstimator():
 		groups = (n_large, n_small//n_large) # For reshaping into patches
 
 		# Take mean of filtered, input map in each patch
-		self.map_reordered = self.map_filtered[self.patch_order[:,0]]
-		self.map_mean = np.mean(np.reshape(self.map_reordered, groups),axis=1)
+		self.map_reordered = []
+		self.map_mean = []
+		for maps in self.map_filtered:
+			self.map_reordered.append(maps[self.patch_order[:,0]])
+		self.map_mean.append(np.mean(np.reshape(self.map_reordered, \
+			groups), axis=1))
 
 		# Take mean of filtered dtheta map in each patch
 		dtheta_reordered = self.map_dtheta_f[self.patch_order[:,0]]
@@ -245,25 +249,28 @@ class LensingEstimator():
 
 		"""
 		self.model = pm.build_lens_model()
-		data = {
-			"N" : hp.nside2npix(self._NSIDE_large), 
-			"M" : hp.nside2npix(self._NSIDE_small), 
-			"T" : self.map_reordered, 
-			"T_mean" : self.map_mean, 
-			"dTx" : self.dtheta_mean, 
-			"dTy" : self.dphi_mean, 
-			"ii" : self.patch_order[:,1], 
-		}
+		self.fit = []
 		init_guess = []
 		dPsix_guess = self.map_mean / self.dtheta_mean
 		dPsiy_guess = self.map_mean / self.dphi_mean
-		start = {
-			"dPsix" : dPsix_guess, 
-			"dPsiy" : dPsiy_guess,
-			"dPsix_total" : np.std(dPsix_guess), 
-			"dPsiy_total" : np.std(dPsiy_guess), 
-		}
-		for i in range(nchains):
-			init.append(start)
-		self.fit = self.model.sampling(data, chains=nchains, iter=steps, \
-			init=init_guess)
+		for i in range(len(self.map_reordered)):
+			data = {
+				"N" : hp.nside2npix(self._NSIDE_large), 
+				"M" : hp.nside2npix(self._NSIDE_small), 
+				"T" : self.map_reordered[i], 
+				"T_mean" : self.map_mean[i], 
+				"dTx" : self.dtheta_mean, 
+				"dTy" : self.dphi_mean, 
+				"ii" : self.patch_order[:,1], 
+			}
+			start = {
+				"dPsix" : dPsix_guess, 
+				"dPsiy" : dPsiy_guess,
+				"dPsix_total" : np.std(dPsix_guess), 
+				"dPsiy_total" : np.std(dPsiy_guess), 
+			}
+			for j in range(nchains):
+				init.append(start)
+			self.fit.append(self.model.sampling(data, \
+				pars=['dPsix_total', 'dPsiy_total'], \
+				chains=nchains, iter=steps, init=init_guess))
