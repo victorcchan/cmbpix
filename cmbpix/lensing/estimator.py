@@ -206,7 +206,7 @@ class LensingEstimator():
 		small_inds = patches(large_inds, self._NSIDE_large, self._NSIDE_small)
 		large_inds = large_inds.repeat(hp.nside2npix(self._NSIDE_small) // \
 										hp.nside2npix(self._NSIDE_large))
-		self.patch_order = np.stack((large_inds, small_inds), axis=1)
+		self.patch_order = np.stack((small_inds, large_inds), axis=1)
 
 	def calculate_patch_statistics(self):
 		"""Determine the statistics for the lensing estimator within patches.
