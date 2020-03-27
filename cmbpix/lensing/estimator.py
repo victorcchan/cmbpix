@@ -270,7 +270,7 @@ class LensingEstimator():
 				"dPsiy_total" : np.std(dPsiy_guess), 
 			}
 			for j in range(nchains):
-				init.append(start)
+				init_guess.append(start)
 			self.fit.append(self.model.sampling(data, \
 				pars=['dPsix_total', 'dPsiy_total'], \
 				chains=nchains, iter=steps, init=init_guess))
