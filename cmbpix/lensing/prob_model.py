@@ -44,8 +44,8 @@ def build_lens_model():
 	The model contains the following parameters:
 	``dPsix`` - (1d-array) The estimated x-deflection in each patch, 
 	``dPsiy`` - (1d-array) The estimated y-deflection in each patch, 
-	``dPsix_total`` - (float) The total variance in x-deflection, and 
-	``dPsiy_total`` - (float) The total variance in y-deflection.
+	``dPsix_total`` - (float) The log total variance in x-deflection, and 
+	``dPsiy_total`` - (float) The log total variance in y-deflection.
 
 	Returns
 	-------
