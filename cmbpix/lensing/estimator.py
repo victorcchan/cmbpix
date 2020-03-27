@@ -202,7 +202,7 @@ class LensingEstimator():
 			in the lower resolution.
 
 		"""
-		large_inds = np.arange(np.nside2npix(self._NSIDE_large), dtype=int)
+		large_inds = np.arange(hp.nside2npix(self._NSIDE_large), dtype=int)
 		small_inds = patches(large_inds, self._NSIDE_large, self._NSIDE_small)
 		large_inds = large_inds.repeat(hp.nside2npix(self._NSIDE_small) // \
 										hp.nside2npix(self._NSIDE_large))
