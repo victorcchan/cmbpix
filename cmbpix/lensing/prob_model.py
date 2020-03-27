@@ -9,6 +9,7 @@ data {
 	vector[N] T_mean; // Mean T in each patch
 	vector[N] dTx; // x-mean T gradient in each patch
 	vector[N] dTy; // y-mean T gradient in each patch
+	int ii[M]; // Indices to broadcast N-sized vectors to M
 }
 
 parameters {
