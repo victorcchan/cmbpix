@@ -9,7 +9,7 @@ data {
 	vector[N] T_mean; // Mean T in each patch
 	vector[N] dTx; // x-mean T gradient in each patch
 	vector[N] dTy; // y-mean T gradient in each patch
-	int[n] ii; // Indices to broadcast N-sized vectors to M
+	int ii[N]; // Indices to broadcast N-sized vectors to M
 }
 
 parameters {
@@ -19,12 +19,15 @@ parameters {
 	real dPsiy_total; // Total lensing variance in y
 }
 
-model{
+transformed parameters {
 	vector<lower=0>[N] T2; // Estimated T variance from lensing/patch
 	T2 = (dPsix .*dTx + dPsiy .*dTy).*(dPsix .*dTx + dPsiy .*dTy);
-	T ~ normal(T_mean[ii], T2[ii])
-	dPsix ~ normal(0, exp(dPsix_total))
-	dPsiy ~ normal(0, exp(dPsiy_total))
+}
+
+model{
+	T ~ normal(T_mean[ii], T2[ii]);
+	dPsix ~ normal(0, exp(dPsix_total));
+	dPsiy ~ normal(0, exp(dPsiy_total));
 }
 """
 
