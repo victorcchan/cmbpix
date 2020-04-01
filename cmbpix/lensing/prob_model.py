@@ -13,15 +13,16 @@ data {
 }
 
 parameters {
-	vector[N] dPsix; // x-lensing deflection in each patch
-	vector[N] dPsiy; // y-lensing deflection in each patch
-	real dPsix_total; // Total lensing variance in x
-	real dPsiy_total; // Total lensing variance in y
+	vector[M] dPsix; // x-lensing deflection in each patch
+	vector[M] dPsiy; // y-lensing deflection in each patch
+	real dPsi_total; // Log total lensing variance
 }
 
 transformed parameters {
-	vector<lower=0>[N] T2; // Estimated T variance from lensing/patch
-	T2 = (dPsix .*dTx + dPsiy .*dTy).*(dPsix .*dTx + dPsiy .*dTy);
+	vector<lower=0>[M] T2; // Estimated T variance from lensing/patch
+	vector<lower=0>[M] dPsi2; // 
+	T2 = (dPsix .*dTx[ii] + dPsiy .*dTy[ii]) .* \
+		(dPsix .*dTx[ii] + dPsiy .*dTy[ii]);
 }
 
 model{
