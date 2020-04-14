@@ -70,7 +70,7 @@ class FilterEstimator():
 		self.map_in = cmbmap
 		self.cl_fid = fiducial_cls
 		self._NSIDE_small = hp.npix2nside(self.map_in.size)
-		self._NSIDE_large = 256 # Fixed
+		self._NSIDE_large = 512 # Fixed
 		self.ells = np.arange(3*self._NSIDE_small)
 		self._lmax = lmax
 
@@ -167,6 +167,7 @@ class FilterEstimator():
 					flush=True)
 			s_alm = hp.almxfl(map_alm, T_filters[f]) # Perform Wiener filter
 			s_map, s_dth, s_dph = hp.alm2map_der1(s_alm, self._NSIDE_small)
+			self.map_ss = s_map
 			del s_map # Don't need this
 			dir_map = (self.map_dtheta*s_dth + self.map_dphi*s_dph)**2 / \
 				((self.map_dtheta**2 + self.map_dphi**2) * \
