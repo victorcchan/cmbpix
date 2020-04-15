@@ -157,9 +157,16 @@ class FilterEstimator():
 		l_alm = hp.almxfl(map_alm, dT_filter)
 		if verbose:
 			print("Creating large scale gradient maps", flush=True)
-		l_map, self.map_dtheta, self.map_dphi = hp.alm2map_der1(l_alm, \
-			self._NSIDE_small)
+		l_map, l_dth, l_dph = hp.alm2map_der1(l_alm, self._NSIDE_small)
 		del l_map, l_alm # Don't need these
+		dth_alm = hp.map2alm(l_dth) # Low pass gradients again
+		dth_alm = hp.almxfl(dth_alm, dT_filter)
+		self.map_dtheta = hp.alm2map(dth_alm, self._NSIDE_small)
+		del dth_alm, l_dth
+		dph_alm = hp.map2alm(l_dph)
+		dph_alm = hp.almxfl(dph_alm, dT_filter)
+		self.map_dphi = hp.alm2map(dph_alm, self._NSIDE_small)
+		del dph_alm, l_dph
 		self.map_filtered = []
 		for f in range(len(T_filters)):
 			if verbose:
