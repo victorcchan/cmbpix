@@ -159,14 +159,31 @@ class FilterEstimator():
 			print("Creating large scale gradient maps", flush=True)
 		l_map, l_dth, l_dph = hp.alm2map_der1(l_alm, self._NSIDE_small)
 		del l_map, l_alm # Don't need these
+		n_small = hp.nside2npix(self._NSIDE_small)
+		n_large = hp.nside2npix(self._NSIDE_large)
+		groups = (n_large, n_small//n_large) # For reshaping patches
+
 		dth_alm = hp.map2alm(l_dth) # Low pass gradients again
 		dth_alm = hp.almxfl(dth_alm, dT_filter)
 		self.map_dtheta = hp.alm2map(dth_alm, self._NSIDE_small)
 		del dth_alm, l_dth
+		# dtheta_reordered = self.map_dtheta[self.patch_order[:,0]]
+		# self.dtheta_mean = np.mean(np.reshape(dtheta_reordered, groups),axis=1)
+		# del dtheta_reordered
+		# self.map_dtheta[self.patch_order[:,0]] = \
+		# 	self.dtheta_mean[self.patch_order[:,1]]
+
 		dph_alm = hp.map2alm(l_dph)
 		dph_alm = hp.almxfl(dph_alm, dT_filter)
 		self.map_dphi = hp.alm2map(dph_alm, self._NSIDE_small)
 		del dph_alm, l_dph
+		# dphi_reordered = self.map_dphi[self.patch_order[:,0]]
+		# self.dphi_mean = np.mean(np.reshape(dphi_reordered, groups),axis=1)
+		# del dphi_reordered
+		# self.map_dphi[self.patch_order[:,0]] = \
+		# 	self.dphi_mean[self.patch_order[:,1]]
+
+		# High-pass maps + Directional filtering
 		self.map_filtered = []
 		for f in range(len(T_filters)):
 			if verbose:
