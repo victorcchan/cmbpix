@@ -77,3 +77,81 @@ def filter_map(map_in, fl):
 	alms = hp.almxfl(alms, fl)
 	map_out = hp.alm2map(alms, NSIDE_in)
 	return map_out
+
+def gradient_flat_num(map_in):
+    """Return the gradient maps of map_in.
+    
+    Perform the central difference derivative on map_in. The values at 
+    boundaries contain left/right derivatives.
+    
+    Parameters
+    ----------
+    map_in: ndmap, ndarray
+        The input map.
+    
+    Returns
+    -------
+    dy: ndmap, ndarray
+        The gradient in the y-direction
+    dx: ndmap, ndarray
+        The gradient in the x-direction
+    """
+    yy, xx = map_in.posmap()
+    dy = enmap.zeros(map_in.shape, map_in.wcs)
+    dx = enmap.zeros(map_in.shape, map_in.wcs)
+    dy[1:-1,:] = (map_in[:-2,:] - map_in[2:,:]) / (yy[:-2,:] - yy[2:,:])
+    dx[:,1:-1] = (map_in[:,:-2] - map_in[:,2:]) / (xx[:,:-2] - xx[:,2:])
+    dy[0,:] = (map_in[1,:] - map_in[0,:]) / (yy[1,:] - yy[0,:])
+    dy[-1,:] = (map_in[-1,:] - map_in[-2,:]) / (yy[-1,:] - yy[-2,:])
+    dx[:,0] = (map_in[:,1] - map_in[:,0]) / (xx[:,1] - xx[:,0])
+    dx[:,-1] = (map_in[:,-1] - map_in[:,-2]) / (xx[:,-1] - xx[:,-2])
+    return dy, dx
+
+def gradient_flat_ell(map_in, lmax=2000):
+    """Return the gradient maps of map_in.
+    
+    Compute the gradient of the map_in in Fourier space. Simultaneously 
+    low-pass the maps such that they only include modes ell < lmax.
+    
+    Parameters
+    ----------
+    map_in: ndmap, ndarray
+        The input map.
+    lmax: int
+        The cutoff ell for low-passing the maps.
+    
+    Returns
+    -------
+    dy: ndmap, ndarray
+        The gradient in the y-direction
+    dx: ndmap, ndarray
+        The gradient in the x-direction
+    """
+    ly, lx = map_in.lmap()
+    lmod = map_in.modlmap()
+    lp = enmap.zeros(map_in.shape)
+    lp[np.where(lmod < lmax)] = 1.
+    map_fft = enmap.fft(map_in)
+    dx = enmap.ifft(map_fft*lp*lx*1j).real
+    dy = enmap.ifft(map_fft*lp*ly*1j).real
+    return dy, dx
+
+def shift2d(map_in):
+    """Shift the 2D fft map such that the origin is in the center.
+    
+    Return map_in with its values rolled such that the origin is in its 
+    center.
+    
+    Parameters
+    ----------
+    map_in: ndmap, ndarray
+        The input 2D fft map.
+    
+    Returns
+    -------
+    map_out: ndmap, ndarray
+        The rolled 2D fft map.
+    """
+    s = map_in.shape
+    map_out = np.roll(map_in, [s[0]//2, s[1]//2], [0,1])[:,::-1]
+    return map_out
