@@ -62,30 +62,30 @@ def patches(ind, NSIDEin, NSIDEout, nest=False):
         is always in RING ordering.
 
     """
-        if NSIDEout/2 == NSIDEin: # Base case
-            inds = np.array(ind)
+    if NSIDEout/2 == NSIDEin: # Base case
+        inds = np.array(ind)
         if nest:
             return hp.nest2ring(NSIDEout, np.tile(np.arange(4), inds.size) + \
                 4*inds.repeat(4))
         else:
             return hp.nest2ring(NSIDEout, np.tile(np.arange(4), inds.size) + \
                 4*hp.ring2nest(NSIDEin, inds).repeat(4))
+    else:
+        inds = np.array(ind)
+        s = inds.size
+        if nest:
+            ipix = np.tile(np.arange(4), s) + 4*inds.repeat(4)
         else:
-            inds = np.array(ind)
-            s = inds.size
-            if nest:
-                ipix = np.tile(np.arange(4), s) + 4*inds.repeat(4)
-            else:
-                ipix = np.tile(np.arange(4), s) + \
-                    4*hp.ring2nest(NSIDEin, inds).repeat(4)
-        return np.concatenate((patches(ipix[:s], NSIDEin*2, NSIDEout, True), 
-                                patches(ipix[s:2*s], NSIDEin*2, \
-                                    NSIDEout, True), 
-                                patches(ipix[2*s:3*s], NSIDEin*2, \
-                                    NSIDEout, True), 
-                                patches(ipix[3*s:], NSIDEin*2, \
-                                    NSIDEout, True), 
-                                ))
+            ipix = np.tile(np.arange(4), s) + \
+                4*hp.ring2nest(NSIDEin, inds).repeat(4)
+    return np.concatenate((patches(ipix[:s], NSIDEin*2, NSIDEout, True), 
+                            patches(ipix[s:2*s], NSIDEin*2, \
+                                NSIDEout, True), 
+                            patches(ipix[2*s:3*s], NSIDEin*2, \
+                                NSIDEout, True), 
+                            patches(ipix[3*s:], NSIDEin*2, \
+                                NSIDEout, True), 
+                            ))
 
 def filter_map(map_in, fl):
     """Apply a filter to the given map.
