@@ -1,6 +1,41 @@
 import numpy as np
 import healpy as hp
 
+def ang2ell(a):
+    """Convert the given angular scale(s) in arcmins to the analogous ell(s).
+
+    Return the ell(s) corresponding to the angular scale(s) set by a.
+
+    Parameters
+    ----------
+    a: float, array of floats
+        The angular scale(s) in arcmins.
+
+    Returns
+    -------
+    ell: float, array of floats
+        The ell mode(s) corresponding to a.
+    """
+    return (2 / a / 10800.) + 1
+
+def ell2ang(ell):
+    """Convert the given ell(s) to its analogous angular scale(s) in arcmins.
+
+    Return the angular scale(s) in arcmins corresponding to the Fourier mode 
+    ell(s).
+
+    Parameters
+    ----------
+    ell: value, array of values
+        The ell mode(s).
+
+    Returns
+    -------
+    a: float, array of floats
+        The angular scale(s) corresponding to ell.
+    """
+    return 2 * 10800. / (ell + 1)
+
 def patches(ind, NSIDEin, NSIDEout, nest=False):
 	"""Daughter pixel indices in a low resolution HEALPix patch.
 
