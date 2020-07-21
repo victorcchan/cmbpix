@@ -190,3 +190,22 @@ def shift2d(map_in):
     s = map_in.shape
     map_out = np.roll(map_in, [s[0]//2, s[1]//2], [0,1])[:,::-1]
     return map_out
+
+def _lin(x, *p):
+    """A generic line function.
+    
+    Return y = mx + b using p[0] = b, p[1] = m.
+    
+    Parameters
+    ----------
+    x: real, array of reals
+        Point(s) at which to evaluate function.
+    p: array of size 2
+        The linear coefficients of the function: p = [b, m].
+    
+    Returns
+    -------
+    y: real, array of reals
+        The linear function output(s) evaluated at x.
+    """
+    return p[0] + p[1]*x
