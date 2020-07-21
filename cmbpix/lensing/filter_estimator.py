@@ -158,6 +158,7 @@ class FilterEstimator():
 		if verbose:
 			print("Creating large scale gradient maps", flush=True)
 		l_map, l_dth, l_dph = hp.alm2map_der1(l_alm, self._NSIDE_small)
+		self.T_long = l_map
 		del l_map, l_alm # Don't need these
 		n_small = hp.nside2npix(self._NSIDE_small)
 		n_large = hp.nside2npix(self._NSIDE_large)
@@ -189,28 +190,53 @@ class FilterEstimator():
 			if verbose:
 				print("Starting filter for {}".format(self.h_ells[f]), \
 					flush=True)
-			s_alm = hp.almxfl(map_alm, T_filters[f]) # Perform Wiener filter
-			s_map, s_dth, s_dph = hp.alm2map_der1(s_alm, self._NSIDE_small)
-			self.map_ss = s_map
-			del s_map # Don't need this
-			dir_map = (self.map_dtheta*s_dth + self.map_dphi*s_dph)**2 / \
-				((self.map_dtheta**2 + self.map_dphi**2) * \
-					(s_dth**2 + s_dph**2)
-					)
-			self.d = dir_map
-			self.sth = s_dth
-			self.sph = s_dph
-			del s_dth, s_dph
+			self.s_alm = hp.almxfl(map_alm, T_filters[f]) # Wiener filter
+			Rmap = np.random.normal(0, 1, hp.nside2npix(self._NSIDE_small))
+			self.r_alm = self.s_alm#hp.map2alm(Rmap)
+			Rmap, r_dth, r_dph = hp.alm2map_der1(self.r_alm, \
+				self._NSIDE_small)
+			s_map, s_dth, s_dph = hp.alm2map_der1(self.s_alm, \
+				self._NSIDE_small)
+			self.map_filtered.append(s_map)
+			# self.map_ss = s_map
+			# del s_map # Don't need this
+			#self.d = dir_map
+			self.dir_map = (self.map_dtheta*r_dth + self.map_dphi*r_dph)#**2 / \
+				#((self.map_dtheta**2 + self.map_dphi**2) * \
+					#(s_dth**2 + s_dph**2)
+					#)
+			self.sth = r_dth
+			self.sph = r_dph
+			del s_dth, s_dph, r_dth, r_dph
 			if verbose:
-				print("Applying direction filter", flush=True)
-			dir_alm = hp.map2alm(dir_map)
-			new_alm = s_alm * dir_alm # Direction filtered alms
-			del s_alm, dir_alm # Don't need these anymore
-			self.map_filtered.append(hp.alm2map(new_alm, self._NSIDE_small))
-			del new_alm
+				print("Converting direction factor to alms", flush=True)
+			self.dir_alm = hp.map2alm(self.dir_map)
+			# new_alm = s_alm * dir_alm # Direction filtered alms
+			# del s_alm, dir_alm # Don't need these anymore
+			# self.map_filtered.append(hp.alm2map(new_alm, self._NSIDE_small))
+			# del new_alm
 		del map_alm
 		if verbose:
 			print("Finished filtering all maps", flush=True)
+
+	def collect_lms(self):
+		"""Estimate lensing power with filtered CMB information.
+
+		Return an estimate of the lensing power spectrum by combining the 
+		spherical harmonic information of the small scale CMB along with the 
+		combined gradient information between the large and small scale CMB. 
+		This is performed in harmonic space, and is a sum over all m-modes 
+		for every ell.
+		"""
+		lmax = 3*self._NSIDE_small-1
+		self.Clpp = np.zeros(lmax+1)
+		for l in self.ells:
+			ms = hp.Alm.getidx(lmax, l, np.arange(l+1))
+			sl = self.s_alm[ms]
+			rl = self.r_alm[ms]
+			dl = self.dir_alm[ms]
+			self.Clpp[l] = np.sum(np.abs(sl)**2 * np.abs(rl)**2 / \
+				np.abs(dl)**2) / (2*l + 1)
 
 	def divide_patches(self):
 		"""Divide the sky map into patches larger than the pixel size.
