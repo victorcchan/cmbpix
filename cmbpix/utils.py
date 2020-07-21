@@ -113,7 +113,7 @@ def filter_map(map_in, fl):
 	map_out = hp.alm2map(alms, NSIDE_in)
 	return map_out
 
-def gradient_flat_num(map_in):
+def numgradient_flat(map_in):
     """Return the gradient maps of map_in.
     
     Perform the central difference derivative on map_in. The values at 
@@ -142,7 +142,7 @@ def gradient_flat_num(map_in):
     dx[:,-1] = (map_in[:,-1] - map_in[:,-2]) / (xx[:,-1] - xx[:,-2])
     return dy, dx
 
-def gradient_flat_ell(map_in, lmax=2000):
+def gradient_flat(map_in, lmax=2000):
     """Return the gradient maps of map_in.
     
     Compute the gradient of the map_in in Fourier space. Simultaneously 
