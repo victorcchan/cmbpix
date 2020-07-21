@@ -5,9 +5,9 @@ from cmbpix.utils import *
 from cmbpix.lensing import prob_model as pm
 
 class LensingEstimator():
-	"""Estimator for small scale lensing in a full sky CMB map.
+	"""Estimator for small scale lensing in a CMB map.
 
-	An object for reducing a HEALPix map of the cosmic microwave 
+	An object for reducing a CMB map of the cosmic microwave 
 	background in (mostly) pixel-space to estimate the effects 
 	of small angular scale weak lensing due to structure formation.
 
