@@ -208,7 +208,7 @@ class FlatSkyLens(LensingEstimator):
                 self._T2patch[i,j] = np.var(self._T_sub[i,j,3:-3,3:-3])
         self._dT2patch = self._dTxpatch**2 + self._dTypatch**2
 
-    def fit_binpts(self, bins=20, plot=False):
+    def fit_binpts(self, bins=50, plot=False):
         """
         
         """
@@ -239,7 +239,8 @@ class FlatSkyLens(LensingEstimator):
         # Good bins that contain data points
         gb = np.where(np.array(nbin) > 5)
         popt, pcov = curve_fit(_lin, dT2[gb][1:-1,0], T2[gb][1:-1,0], 
-                                [1, 1e-10], sigma=T2[gb][1 :-1,1])
+                                [1, 1e-10], sigma=T2[gb][1 :-1,1], 
+                                absolute_sigma=True)
 
         self.line = popt
         self.dline = pcov
@@ -257,7 +258,8 @@ class FlatSkyLens(LensingEstimator):
             plt.show()
             plt.close()
 
-    def fit_binerr(self, bins=20, plot=False):
+    def fit_binerr(self, bins=50, edges=None, errs=None, plot=False, 
+                    showerr=True):
         """
         
         """
@@ -265,17 +267,33 @@ class FlatSkyLens(LensingEstimator):
         dT_ord = self._dT2patch.flatten()[g_ord]
         T_ord = self._T2patch.flatten()[g_ord]
         T_err = np.zeros(T_ord.size)
-        N = T_ord.size // bins # Roughly equal number of points in bins
-        for b in range(bins):
-            T_err[N*b:] = T_ord[N*b:N*(b+1)].std()
+        if errs is None and edges is None:
+            N = T_ord.size // bins # Roughly equal number of points in bins
+            self.bin_edges = dT_ord[np.arange(bins, dtype=int)*N]
+            self.bin_edges[0] = 0 # Ensure we get everything
+            self.errs = np.zeros(bins)
+            for b in range(bins):
+                self.errs[b] = T_ord[N*b:N*(b+1)].std()
+                T_err[N*b:] = T_ord[N*b:N*(b+1)].std()
+        else:
+            self.bin_edges = edges
+            self.bin_edges[0] = 0 # Ensure we get everything
+            self.errs = errs
+            for i, b in enumerate(self.bin_edges):
+                T_err[np.where(dT_ord > b)] = self.errs[i]
         popt, pcov = curve_fit(_lin, dT_ord, T_ord, 
-                                [1, 1e-10], sigma=T_err)
+                                [1, 1e-10], sigma=T_err, 
+                                absolute_sigma=True)
         self.line = popt
         self.dline = pcov
         
         if plot:
             plt.figure(figsize=(12,8))
-            plt.errorbar(dT_ord.flatten(), T_ord.flatten(), yerr=T_err, fmt='.')
+            if showerr:
+                plt.errorbar(dT_ord.flatten(), T_ord.flatten(), 
+                                yerr=T_err, fmt='.')
+            else:
+                plt.plot(dT_ord.flatten(), T_ord.flatten(), '.')
             gs = np.linspace(dT_ord.min(), dT_ord.max(), 200)
             plt.plot(gs, _lin(gs, *popt), c='C1')
             plt.xscale('log')
@@ -285,7 +303,7 @@ class FlatSkyLens(LensingEstimator):
             plt.show()
             plt.close()
 
-    def fit_pts(self, bins=20, plot=False):
+    def fit_pts(self, bins=50, plot=False, showerr=True):
         """
         
         """
@@ -294,13 +312,18 @@ class FlatSkyLens(LensingEstimator):
         T_ord = self._T2patch.flatten()[g_ord]
         T_err = np.ones(T_ord.size)*T_ord.std()
         popt, pcov = curve_fit(_lin, dT_ord, T_ord, 
-                                [1, 1e-10], sigma=T_err)
+                                [1, 1e-10], sigma=T_err, 
+                                absolute_sigma=True)
         self.line = popt
         self.dline = pcov
         
         if plot:
             plt.figure(figsize=(12,8))
-            plt.errorbar(dT_ord.flatten(), T_ord.flatten(), yerr=T_err, fmt='.')
+            if showerr:
+                plt.errorbar(dT_ord.flatten(), T_ord.flatten(), 
+                                yerr=T_err, fmt='.')
+            else:
+                plt.plot(dT_ord.flatten(), T_ord.flatten(), '.')
             gs = np.linspace(dT_ord.min(), dT_ord.max(), 200)
             plt.plot(gs, _lin(gs, *popt), c='C1')
             plt.xscale('log')
@@ -310,7 +333,7 @@ class FlatSkyLens(LensingEstimator):
             plt.show()
             plt.close()
 
-    def fit_ptserr(self, bins=20, plot=False):
+    def fit_ptserr(self, bins=50, plot=False, showerr=True):
         """
         
         """
@@ -320,13 +343,18 @@ class FlatSkyLens(LensingEstimator):
         T_ord = self._T2patch.flatten()[g_ord]
         T_err = T_ord * np.sqrt(2./(n-1))
         popt, pcov = curve_fit(_lin, dT_ord, T_ord, 
-                                [1, 1e-10], sigma=T_err)
+                                [1, 1e-10], sigma=T_err, 
+                                absolute_sigma=True)
         self.line = popt
         self.dline = pcov
         
         if plot:
             plt.figure(figsize=(12,8))
-            plt.errorbar(dT_ord.flatten(), T_ord.flatten(), yerr=T_err, fmt='.')
+            if showerr:
+                plt.errorbar(dT_ord.flatten(), T_ord.flatten(), 
+                                yerr=T_err, fmt='.')
+            else:
+                plt.plot(dT_ord.flatten(), T_ord.flatten(), '.')
             gs = np.linspace(dT_ord.min(), dT_ord.max(), 200)
             plt.plot(gs, _lin(gs, *popt), c='C1')
             plt.xscale('log')
