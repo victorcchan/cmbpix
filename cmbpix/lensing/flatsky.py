@@ -281,6 +281,9 @@ class FlatSkyLens(LensingEstimator):
             self.errs = errs
             for i, b in enumerate(self.bin_edges):
                 T_err[np.where(dT_ord > b)] = self.errs[i]
+        self._T_err = T_err
+        self._T_ord = T_ord
+        self._dT_ord = dT_ord
         popt, pcov = curve_fit(_lin, dT_ord, T_ord, 
                                 [1, 1e-10], sigma=T_err, 
                                 absolute_sigma=True)
@@ -363,3 +366,23 @@ class FlatSkyLens(LensingEstimator):
             plt.tight_layout()
             plt.show()
             plt.close()
+
+    def chi2line(self, p=None):
+        """Determine the reduced chi2 statistic for the given line.
+
+        Determine the reduced chi2 statistic for the given line. If no line 
+        is given, then the fitted line is used.
+
+        Parameters
+        ----------
+        p: array of size 2, Default=None
+            The parameters of the line: [Intercept, Slope]
+
+        Returns
+        -------
+        red_chi2:
+            The reduced chi2 statistic for the line
+        """
+        diff = self._T_ord - _lin(self._dT_ord, *p)
+        chi2 = np.sum(diff**2 / self._T_err**2)
+        return chi2 / (self._T_ord.size - 2)
