@@ -402,16 +402,16 @@ class FlatSkyLens(LensingEstimator):
 
         bgrid = np.linspace(self.line[0] - 5*np.sqrt(self.dline[0][0]), 
                             self.line[0] + 5*np.sqrt(self.dline[0][0]), 
-                            20
+                            100
                            )
         mgrid = np.linspace(self.line[1] - 5*np.sqrt(self.dline[1][1]), 
                             self.line[1] + 5*np.sqrt(self.dline[1][1]), 
-                            20
+                            100
                            )
         db = bgrid[1:] - bgrid[:-1]
         dm = mgrid[1:] - mgrid[:-1]
         pgrid = np.meshgrid(bgrid, mgrid)
-        self.cgrid = np.zeros((20,20))
+        self.cgrid = np.zeros((100,100))
         for i, b in enumerate(bgrid):
             for j, m in enumerate(mgrid):
                 self.cgrid[i,j] = self.chi2line([b, m])
