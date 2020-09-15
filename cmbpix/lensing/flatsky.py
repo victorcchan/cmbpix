@@ -375,7 +375,7 @@ class FlatSkyLens(LensingEstimator):
 
         Parameters
         ----------
-        p: array of size 2, Default=None
+        p: array of size 2, default=None
             The parameters of the line: [Intercept, Slope]
 
         Returns
@@ -386,3 +386,55 @@ class FlatSkyLens(LensingEstimator):
         diff = self._T_ord - _lin(self._dT_ord, *p)
         chi2 = np.sum(diff**2 / self._T_err**2)
         return chi2 / (self._T_ord.size - 2)
+
+    def chi2grid(self, plot=False):
+        """Compute the grid of reduced chi2 values around the fitted space.
+
+        Compute the grid of reduced chi2 values for the space +/- 5 sigma 
+        around the parameters fitted for by one of the curve_fit methods. 
+        Also saves the parameters/errors inferred from the chi2 statistics.
+
+        Parameters
+        ----------
+        plot: bool, default=False
+            If True, generate a 2D plot of the grid of reduced chi2 values.
+        """
+
+        bgrid = np.linspace(E.line[0] - 5*np.sqrt(E.dline[0][0]), 
+                            E.line[0] + 5*np.sqrt(E.dline[0][0]), 
+                            20
+                           )
+        mgrid = np.linspace(E.line[1] - 5*np.sqrt(E.dline[1][1]), 
+                            E.line[1] + 5*np.sqrt(E.dline[1][1]), 
+                            20
+                           )
+        db = bgrid[1:] - bgrid[:-1]
+        dm = mgrid[1:] - mgrid[:-1]
+        pgrid = np.meshgrid(bgrid, mgrid)
+        self.cgrid = np.zeros((20,20))
+        for i, b in enumerate(bgrid):
+            for j, m in enumerate(mgrid):
+                self.cgrid[i,j] = self.chi2line([b, m])
+        Pgrid = np.exp(-(cgrid)/2)
+        norm = np.sum(Pgrid * db[0] * dm[0])
+        mI = np.sum(Pgrid * pgrid[0] * db[0] * dm[0]) / norm
+        dI = np.sum(Pgrid * (pgrid[0] - mI)**2 * db[0] * dm[0]) / norm
+        mS = np.sum(Pgrid * pgrid[1] * db[0] * dm[0]) / norm
+        dS = np.sum(Pgrid * (pgrid[1] - mS)**2 * db[0] * dm[0]) / norm
+        self.pc2 = np.array([mI, mS])
+        self.dpc2 = np.array([dI, dS])
+        if plot:
+            plt.figure(figsize=(12,8))
+            try:
+                plt.pcolormesh(pgrid[0], pgrid[1], cgrid, cmap=cmr.ocean)
+            except(NameError):
+                plt.pcolormesh(pgrid[0], pgrid[1], cgrid)
+            plt.colorbar(label=r"Reduced $\chi^2$")
+            contours = plt.contour(pgrid[0], pgrid[1], cgrid, colors='red')
+            plt.clabel(contours, inline=True, fontsize=14)
+            plt.axvline(E.line[0], c='w')
+            plt.axhline(E.line[1], c='w')
+            plt.xlabel(r"Intercept [$\mu$K$^2$]")
+            plt.ylabel(r"Slope [rad$^2$]")
+            plt.show()
+            plt.close()
