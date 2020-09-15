@@ -400,12 +400,12 @@ class FlatSkyLens(LensingEstimator):
             If True, generate a 2D plot of the grid of reduced chi2 values.
         """
 
-        bgrid = np.linspace(E.line[0] - 5*np.sqrt(E.dline[0][0]), 
-                            E.line[0] + 5*np.sqrt(E.dline[0][0]), 
+        bgrid = np.linspace(self.line[0] - 5*np.sqrt(self.dline[0][0]), 
+                            self.line[0] + 5*np.sqrt(self.dline[0][0]), 
                             20
                            )
-        mgrid = np.linspace(E.line[1] - 5*np.sqrt(E.dline[1][1]), 
-                            E.line[1] + 5*np.sqrt(E.dline[1][1]), 
+        mgrid = np.linspace(self.line[1] - 5*np.sqrt(self.dline[1][1]), 
+                            self.line[1] + 5*np.sqrt(self.dline[1][1]), 
                             20
                            )
         db = bgrid[1:] - bgrid[:-1]
@@ -432,8 +432,8 @@ class FlatSkyLens(LensingEstimator):
             plt.colorbar(label=r"Reduced $\chi^2$")
             contours = plt.contour(pgrid[0], pgrid[1], cgrid, colors='red')
             plt.clabel(contours, inline=True, fontsize=14)
-            plt.axvline(E.line[0], c='w')
-            plt.axhline(E.line[1], c='w')
+            plt.axvline(self.line[0], c='w')
+            plt.axhline(self.line[1], c='w')
             plt.xlabel(r"Intercept [$\mu$K$^2$]")
             plt.ylabel(r"Slope [rad$^2$]")
             plt.show()
