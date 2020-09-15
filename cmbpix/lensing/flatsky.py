@@ -415,7 +415,7 @@ class FlatSkyLens(LensingEstimator):
         for i, b in enumerate(bgrid):
             for j, m in enumerate(mgrid):
                 self.cgrid[i,j] = self.chi2line([b, m])
-        Pgrid = np.exp(-(cgrid)/2)
+        Pgrid = np.exp(-(self.cgrid)/2)
         norm = np.sum(Pgrid * db[0] * dm[0])
         mI = np.sum(Pgrid * pgrid[0] * db[0] * dm[0]) / norm
         dI = np.sum(Pgrid * (pgrid[0] - mI)**2 * db[0] * dm[0]) / norm
@@ -426,12 +426,12 @@ class FlatSkyLens(LensingEstimator):
         if plot:
             plt.figure(figsize=(12,8))
             try:
-                plt.pcolormesh(pgrid[0], pgrid[1], cgrid, cmap=cmr.ocean)
+                plt.pcolormesh(pgrid[0], pgrid[1], self.cgrid, cmap=cmr.ocean)
             except(NameError):
-                plt.pcolormesh(pgrid[0], pgrid[1], cgrid)
+                plt.pcolormesh(pgrid[0], pgrid[1], self.cgrid)
             plt.colorbar(label=r"Reduced $\chi^2$")
-            contours = plt.contour(pgrid[0], pgrid[1], cgrid, colors='red')
-            plt.clabel(contours, inline=True, fontsize=14)
+            cont = plt.contour(pgrid[0], pgrid[1], self.cgrid, colors='red')
+            plt.clabel(cont, inline=True, fontsize=14)
             plt.axvline(self.line[0], c='w')
             plt.axhline(self.line[1], c='w')
             plt.xlabel(r"Intercept [$\mu$K$^2$]")
