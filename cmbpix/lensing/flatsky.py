@@ -259,7 +259,7 @@ class FlatSkyLens(LensingEstimator):
             plt.close()
 
     def fit_binerr(self, bins=50, edges=None, errs=None, plot=False, 
-                    showerr=True):
+                    showerr=True, filename=None):
         """
         
         """
@@ -303,6 +303,8 @@ class FlatSkyLens(LensingEstimator):
             plt.xlabel(r"$|\nabla T|^2~[\mu{\rm K}^2/rad^2$]")
             plt.ylabel(r"$\sigma_T^2~[\mu{\rm K}^2]$")
             plt.tight_layout()
+            if filename is not None:
+                plt.savefig(str(filename))
             plt.show()
             plt.close()
 
