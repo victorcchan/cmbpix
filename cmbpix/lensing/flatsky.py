@@ -259,7 +259,7 @@ class FlatSkyLens(LensingEstimator):
             plt.close()
 
     def fit_binerr(self, bins=50, edges=None, errs=None, plot=False, 
-                    showerr=True, filename=None):
+                    showerr=True, showline=True, filename=None, scale='log'):
         """
         
         """
@@ -298,8 +298,9 @@ class FlatSkyLens(LensingEstimator):
             else:
                 plt.plot(dT_ord.flatten(), T_ord.flatten(), '.')
             gs = np.linspace(dT_ord.min(), dT_ord.max(), 200)
-            plt.plot(gs, _lin(gs, *popt), c='C1')
-            plt.xscale('log')
+            if showline:
+                plt.plot(gs, _lin(gs, *popt), c='C1')
+            plt.xscale(scale)
             plt.xlabel(r"$|\nabla T|^2~[\mu{\rm K}^2/rad^2$]")
             plt.ylabel(r"$\sigma_T^2~[\mu{\rm K}^2]$")
             plt.tight_layout()
