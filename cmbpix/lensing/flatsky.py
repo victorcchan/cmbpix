@@ -304,7 +304,7 @@ class FlatSkyLens(LensingEstimator):
             plt.ylabel(r"$\sigma_T^2~[\mu{\rm K}^2]$")
             plt.tight_layout()
             if filename is not None:
-                plt.savefig(str(filename))
+                plt.savefig(str(filename), transparent=True)
             plt.show()
             plt.close()
 
