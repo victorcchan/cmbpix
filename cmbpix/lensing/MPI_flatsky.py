@@ -434,7 +434,9 @@ class MPIFlatSkyLens(LensingEstimator):
 
         Compute the model likelihood for the map's patch statistics assuming 
         that the small scale temperature variance follows a Pearson Type III 
-        distribution dictated by the background temperature gradient.
+        distribution dictated by the background temperature gradient. 
+        Estimator outputs are stored in the pP3, and errors in the dpP3 
+        attributes.
 
         Parameters
         ----------
@@ -628,7 +630,15 @@ class MPIFlatSkyLens(LensingEstimator):
         plt.show()
 
     def PearsonMPI(self):
-        """
+        """Compute the Pearson Type III Likelihood (MPI implementation).
+
+        Compute the model likelihood for the patch statistics of the map 
+        assuming the small scale temperature variance follows a Pearson Type 
+        III distribution dictated by the background temperature gradient. 
+        This is the MPI implementation, which splits up the computation of 
+        the likelihood along the N parameter equally amongst the processes. 
+        Estimator outputs are stored in the pP3, and errors in the dpP3 
+        attributes.
         """
         line = np.empty(2)
         dline = np.empty(2)
