@@ -538,7 +538,9 @@ class FlatSkyLens(LensingEstimator):
 
         Compute the model likelihood for the map's patch statistics assuming 
         that the small scale temperature variance follows a Pearson Type III 
-        distribution dictated by the background temperature gradient.
+        distribution dictated by the background temperature gradient. 
+        Estimator outputs are stored in the pP3, and errors in the dpP3 
+        attributes.
 
         Parameters
         ----------
