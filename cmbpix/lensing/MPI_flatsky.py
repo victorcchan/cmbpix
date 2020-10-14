@@ -429,8 +429,23 @@ class MPIFlatSkyLens(LensingEstimator):
             plt.show()
             plt.close()
 
-    def PearsonLikelihood(self, plot=None):
-        """
+    def PearsonLikelihood(self, plot=None, plotname=None):
+        """Compute the model Pearson Type III model likelihood with patches.
+
+        Compute the model likelihood for the map's patch statistics assuming 
+        that the small scale temperature variance follows a Pearson Type III 
+        distribution dictated by the background temperature gradient.
+
+        Parameters
+        ----------
+        plot: str, default=None
+            If plot is any of ['s', 'm'], then this method calls the 
+            Sliced or Marginalized plotting methods associated with the 
+            Pearson likelihood, respectively. Also works for 
+            ['sliced', 'marginalized'], or ['slice', 'margin']. No plot 
+            if None is given.
+        plotname: str, default=None
+            If given, then save the likelihood corner plot at this location
         """
         bgrid = np.linspace(self.line[0] - 5*np.sqrt(self.dline[0][0]), 
                             self.line[0] + 10*np.sqrt(self.dline[0][0]), 
@@ -476,11 +491,11 @@ class MPIFlatSkyLens(LensingEstimator):
         self.sigs = sigs
         sls = [":", "--", "-"]
         if plot == "m" or plot == "marginalized" or plot == "margin":
-            self.PearsonPlotMarginalized()
+            self.PearsonPlotMarginalized(plotname)
         if plot == "s" or plot == "sliced" or plot == "slice":
-            self.PearsonPlotSliced()
+            self.PearsonPlotSliced(plotname)
 
-    def PearsonPlotMarginalized(self):
+    def PearsonPlotMarginalized(self, plotname=None):
         """
         """
         pgrid = self.pgrid
@@ -534,9 +549,10 @@ class MPIFlatSkyLens(LensingEstimator):
         axs[0,1].axis('off')
         axs[0,2].axis('off')
         axs[1,2].axis('off')
+        plt.savefig(plotname)
         plt.show()
 
-    def PearsonPlotSliced(self):
+    def PearsonPlotSliced(self, plotname=None):
         """
         """
         pgrid = self.pgrid
@@ -590,6 +606,7 @@ class MPIFlatSkyLens(LensingEstimator):
         axs[0,1].axis('off')
         axs[0,2].axis('off')
         axs[1,2].axis('off')
+        plt.savefig(plotname)
         plt.show()
 
     def PearsonMPI(self):
