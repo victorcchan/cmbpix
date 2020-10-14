@@ -1,5 +1,6 @@
 import numpy as np
 import healpy as hp
+from pixell import enmap, utils, curvedsky
 
 def ang2ell(a):
     """Convert the given angular scale(s) in arcmins to the analogous ell(s).
@@ -191,21 +192,68 @@ def shift2d(map_in):
     map_out = np.roll(map_in, [s[0]//2, s[1]//2], [0,1])[:,::-1]
     return map_out
 
-def _lin(x, *p):
-    """A generic line function.
-
-    Return y = mx + b using p[0] = b, p[1] = m.
-
+def add_noise(data, noise, pol=True):
+    """Add pixel noise to the data.
+    
+    Add pixel noise to the data. If data contains multiple maps, the first 
+    is assumed to be T, and the rest are assumed to be polarization.
+    
     Parameters
     ----------
-    x: real, array of reals
-        Point(s) at which to evaluate function.
-    p: array of size 2
-        The linear coefficients of the function: p = [b, m].
-
+    data: array
+        The map to add noise to.
+    noise: value
+        The pixel noise levels in units of uK-arcmin.
+    pol: bool, default=True
+        If True, assume the first map to be T and the rest polarization. 
+        If False, assume all maps to be T.
+    
     Returns
     -------
-    y: real, array of reals
-        The linear function output(s) evaluated at x.
+    noisymap: array
+        The map with noise added.
     """
-    return p[0] + p[1]*x
+    sh = data.shape
+    try:
+        resol = hp.nside2resol(hp.get_nside(data), arcmin=True)
+        form = 'HEALPix'
+    except(ValueError, TypeError):
+        try:
+            resol = np.abs(data.wcs.wcs.cdelt[0])*60 # Convert deg->arcmin
+            form = 'enmap'
+        except(AttributeError):
+            raise ValueError("The data isn't in HEALPix or enmap format.")
+    nmap = np.random.normal(0, 1, sh) * noise / resol
+    # Statistical penalty for polarization noise
+    if form == 'HEALPix' and len(sh) > 1 and pol:
+        nmap[1:] *= np.sqrt(2)
+    elif form == 'enmap' and len(sh) > 2 and sh[0]> 1 and pol:
+        nmap[1:] *= np.sqrt(2)
+    return nmap + data
+
+def alm2stripe(alm, width, resol, proj='car'):
+    """Return the stripe centered at dec=0 of the map corresponding to alm.
+    
+    Return a slice of the map corresponding to alm from declination -width/2 
+    to +width/2, and right ascension -180deg to +180deg.
+    
+    Parameters
+    ----------
+    alm: array
+        The set of alms to convert to map-space.
+    width: value
+        The width of the map (centered at dec=0) in degrees.
+    resol: value
+        The resolution of the map in arcmin.
+    proj: str, default='car'
+        The projection of the map. Must be compatible with pixell.
+    
+    Returns
+    -------
+    stmap: array
+        The output map.
+    """
+    box = np.array([[-width/2,180], [width/2,-180]]) * utils.degree
+    shape, wcs = enmap.geometry(pos=box, res=resol*utils.arcmin, proj=proj)
+    cmap = enmap.zeros(shape, wcs)
+    return curvedsky.alm2map(alm, cmap, method='cyl')
