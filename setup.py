@@ -15,5 +15,6 @@ setuptools.setup(
     long_description_content_type='text/markdown', 
 	packages=setuptools.find_packages(include=["cmbpix", "cmbpix.lensing"]), 
 	python_requires=">=3", 
-	install_requires=["numpy", "healpy", "pystan", "pixell", "matplotlib"], 
+	install_requires=["numpy", "healpy", "pystan", "pixell", "matplotlib", 
+					  "mpi4py"], 
 )
