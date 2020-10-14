@@ -2,8 +2,13 @@ import numpy as np
 from pixell import enmap, utils
 from cmbpix.utils import *
 from cmbpix.lensing.estimator import LensingEstimator
-from scipy.optimize import curve_fit
+from scipy.optimize import curve_fit, fsolve
+from scipy.special import gamma
 import matplotlib.pyplot as plt
+try:
+    import cmasher as cmr
+except(ModuleNotFoundError):
+    pass
 
 def _lin(x, *p):
     """A generic line function.
@@ -23,6 +28,77 @@ def _lin(x, *p):
         The linear function output(s) evaluated at x.
     """
     return p[0] + p[1]*x
+
+def _Pearson3(s2, N=1., sig2=1., *p):
+    """Return the PDF of the Pearson Type III distribution evaluated at s2.
+    
+    Evaluate the PDF of the Pearson Type III distribution at s2.
+    
+    Parameters
+    ----------
+    s2: value(s)
+        The value(s) at which to evaluate the Pearson III distribution.
+    N: value(s), default=1.
+        The number of independent samples used to estimate s2.
+    sig2: values(s), default=1.
+        The width of the distribution from which the samples of s2 were drawn.
+    """
+    if p:
+        N = p[0]
+        sig2 = p[1]
+    ans = (N / (2 * sig2)) ** ((N-1)/2.)
+    ans *= s2 ** ((N-3)/2.)
+    ans *= np.exp(-N * s2 / (2 * sig2))
+    return ans / gamma((N-1) / 2.)
+
+def _PearsonWidth(vol, xs, N, sig2, *p):
+    """Return the band of s2 where the integral of Pearson III is vol.
+    
+    Return a, b such that the integral of the Pearson III distribution is 
+    vol, and p(a) = p(b).
+    
+    Parameters
+    ----------
+    vol: value between [0,1]
+        The confidence level to find for the Pearson III distribution
+    xs: 1d-array
+        The range of xs to consider
+    N: value
+        Pearson III parameter corresponding to the number of indep samples
+    sig2: value
+        Pearson III parameter corresponding to the spread of sample dist
+        
+    Returns
+    -------
+    [a, b]: array of size 2
+        The range of x such that the confidence interval of Pearson III is vol
+    """
+    if p:
+        N = p[0]
+        sig2 = p[1]
+    Px = _Pearson3(xs, N, sig2)
+    imode = np.argmax(Px)
+    xmode = xs[imode]
+    a0 = (xmode - xs.min())/2
+    def findb(a):
+        Pa = Pearson3(a, N, sig2)
+        bguess = xs[imode:][np.argmin(np.abs(Px[imode:] - Pa))]
+        minb = lambda b : _Pearson3(b, N, sig2) - Pa
+        b = fsolve(minb, bguess)[0]
+        return b
+    def optP(a):
+        b = findb(a)
+        ab = np.linspace(a, b, 1001)
+        intP = np.sum(_Pearson3(ab, N, sig2) * (ab[1]-ab[0]))
+        return intP - vol
+    a = fsolve(optP, a0)[0]
+    b = findb(a)
+    return [a, b]
+
+
+
+def _bin_mids(b):
+    return (b[1:] + b[:-1]) / 2
 
 class FlatSkyLens(LensingEstimator):
     """Estimator for small scale lensing in a flat sky CMB map.
@@ -411,33 +487,189 @@ class FlatSkyLens(LensingEstimator):
                             self.line[1] + 5*np.sqrt(self.dline[1][1]), 
                             100
                            )
-        db = bgrid[1:] - bgrid[:-1]
-        dm = mgrid[1:] - mgrid[:-1]
-        pgrid = np.meshgrid(bgrid, mgrid)
+        db = bgrid[1] - bgrid[0]
+        dm = mgrid[1] - mgrid[0]
+        pgrid = np.meshgrid(bgrid, mgrid, indexing='ij')
+        self.npgrid = pgrid
         self.cgrid = np.zeros((100,100))
         for i, b in enumerate(bgrid):
             for j, m in enumerate(mgrid):
                 self.cgrid[i,j] = self.chi2line([b, m])
+        npatch = self._dT2patch.flatten().size-2
+        self.cgrid *= npatch
         Pgrid = np.exp(-(self.cgrid)/2)
-        norm = np.sum(Pgrid * db[0] * dm[0])
-        mI = np.sum(Pgrid * pgrid[0] * db[0] * dm[0]) / norm
-        dI = np.sum(Pgrid * (pgrid[0] - mI)**2 * db[0] * dm[0]) / norm
-        mS = np.sum(Pgrid * pgrid[1] * db[0] * dm[0]) / norm
-        dS = np.sum(Pgrid * (pgrid[1] - mS)**2 * db[0] * dm[0]) / norm
+        self.nPgrid = Pgrid
+        norm = np.sum(Pgrid * db * dm)
+        mI = np.sum(Pgrid * pgrid[0] * db * dm) / norm
+        dI = np.sum(Pgrid * (pgrid[0] - mI)**2 * db * dm) / norm
+        mS = np.sum(Pgrid * pgrid[1] * db * dm) / norm
+        dS = np.sum(Pgrid * (pgrid[1] - mS)**2 * db * dm) / norm
         self.pc2 = np.array([mI, mS])
         self.dpc2 = np.array([dI, dS])
+        nsigs = []
+        for i in [3,2,1]:
+            nsigs.append(np.exp(-npatch*
+                                self.chi2line([mI, mS+np.sqrt(dS)*i])/2)/norm)
+        self.nnorm = norm
+        self.nsigs = nsigs
         if plot:
             plt.figure(figsize=(12,8))
             try:
-                plt.pcolormesh(pgrid[0], pgrid[1], self.cgrid, cmap=cmr.ocean)
+                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm, cmap=cmr.ocean_r)
             except(NameError):
-                plt.pcolormesh(pgrid[0], pgrid[1], self.cgrid)
-            plt.colorbar(label=r"Reduced $\chi^2$")
-            cont = plt.contour(pgrid[0], pgrid[1], self.cgrid, colors='red')
-            plt.clabel(cont, inline=True, fontsize=14)
-            plt.axvline(self.line[0], c='w')
-            plt.axhline(self.line[1], c='w')
+                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm)
+            plt.colorbar(label=r"Likelihood")
+            ncontours = plt.contour(pgrid[0], pgrid[1], Pgrid/norm, nsigs, 
+                                    colors='red')
+            fmt = {}
+            strs = [r"$3\sigma$", r"$2\sigma$", r"$1\sigma$"]
+            for l, s in zip(ncontours.levels, strs):
+                fmt[l] = s
+            plt.clabel(ncontours, fmt=fmt, inline=True, fontsize=20)
+            plt.axvline(self.line[0], c='k')
+            plt.axhline(self.line[1], c='k')
             plt.xlabel(r"Intercept [$\mu$K$^2$]")
             plt.ylabel(r"Slope [rad$^2$]")
             plt.show()
             plt.close()
+
+    def PearsonLikelihood(self, plot=None):
+        """
+        """
+        bgrid = np.linspace(self.line[0] - 5*np.sqrt(self.dline[0][0]), 
+                            self.line[0] + 10*np.sqrt(self.dline[0][0]), 
+                            200
+                           )
+        mgrid = np.linspace(self.line[1] - 5*np.sqrt(self.dline[1][1]), 
+                            self.line[1] + 10*np.sqrt(self.dline[1][1]), 
+                            200
+                           )
+        Ngrid = np.linspace(10, 20, 50)
+        pgrid = np.meshgrid(bgrid, mgrid, Ngrid, indexing='ij')
+        self.pgrid = pgrid
+        Pgrid = np.zeros((200,200,50))
+        db = bgrid[1] - bgrid[0]
+        dm = mgrid[1] - mgrid[0]
+        dN = Ngrid[1] - Ngrid[0]
+        dT2p = self._dT2patch.flatten()
+        T2p = self._T2patch.flatten()
+        for k, N in enumerate(Ngrid):
+            Pgrid[:,:,k] = np.sum(np.log(_Pearson3(T2p[None,None,...], N, 
+                                                   _lin(dT2p, 
+                                                   *[pgrid[0][:,:,k][...,None], 
+                                                     pgrid[1][:,:,k][...,None]]
+                                                        ))), axis=2)
+        Pmean = np.mean(Pgrid)
+        Pgrid = np.exp(Pgrid-Pmean)
+        norm = np.sum(Pgrid * db * dm * dN)
+        Pgrid /= norm
+        self.Pgrid = Pgrid
+        mI = np.sum(Pgrid * pgrid[0] * db * dm * dN)
+        dI = np.sum(Pgrid * (pgrid[0] - mI)**2 * db * dm * dN)
+        mS = np.sum(Pgrid * pgrid[1] * db * dm * dN)
+        dS = np.sum(Pgrid * (pgrid[1] - mS)**2 * db * dm * dN)
+        mN = np.sum(Pgrid * pgrid[2] * db * dm * dN)
+        dN = np.sum(Pgrid * (pgrid[2] - mN)**2 * db * dm * dN)
+        self.pP3 = np.array([mI, mS, mN])
+        self.dpP3 = np.array([dI, dS, dN])
+        sigs = []
+        for i in [3,2,1]:
+            cline = [mI+np.sqrt(dI)*i, mS]
+            P = np.sum(np.log(_Pearson3(T2p, mN, _lin(dT2p, *cline))))
+            sigs.append(np.exp(P - Pmean)/norm)
+        self.sigs = sigs
+        sls = [":", "--", "-"]
+        if plot == "m" or plot == "marginalized" or plot == "margin":
+            f, axs = plt.subplots(3, 3, figsize=(10,10), 
+                                  gridspec_kw={'hspace':0.125, 
+                                               'wspace':0.125})
+            # 2D plots
+            ## b, m
+            axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
+                                np.sum(Pgrid, axis=2), cmap=cmr.ocean_r)
+            iN = np.argmin(np.abs(Ngrid - mN))
+            axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
+                             Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
+            axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
+                             self.nPgrid/self.nnorm, self.nsigs, 
+                             linestyles=sls, colors='red')
+            axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
+            ## N, m
+            axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
+                                np.sum(Pgrid, axis=0), cmap=cmr.ocean_r)
+            iI = np.argmin(np.abs(bgrid - mI))
+            axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
+                             Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
+            axs[2,1].set(yticklabels=[], xlabel=r"$N$")
+            ## b, N
+            axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
+                                np.sum(Pgrid, axis=1), cmap=cmr.ocean_r)
+            iS = np.argmin(np.abs(mgrid - mS))
+            axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
+                             Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
+            axs[1,0].set(xticklabels=[], ylabel=r"$N$")
+            # 1D histograms
+            ## b
+            axs[0,0].plot(bgrid, np.sum(Pgrid, axis=(1,2)))
+            axs[0,0].set(xticklabels=[], yticks=[], 
+                title=r"$b = {:.4f} \pm {:.4f}$".format(mI, np.sqrt(dI)))
+            ## N
+            axs[1,1].plot(Ngrid, np.sum(Pgrid, axis=(0,1)))
+            axs[1,1].set(xticklabels=[], yticks=[], 
+                title=r"$N = {:.2f} \pm {:.2f}$".format(mN, np.sqrt(dN)))
+            ## m
+            axs[2,2].plot(mgrid, np.sum(Pgrid, axis=(0,2)))
+            axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
+                title=r"$m = {:.2e} \pm {:.2e}$".format(mS, np.sqrt(dS)))
+            # Hide unused axes
+            axs[0,1].axis('off')
+            axs[0,2].axis('off')
+            axs[1,2].axis('off')
+            plt.show()
+        if plot == "s" or plot == "sliced" or plot == "slice":
+            f, axs = plt.subplots(3, 3, figsize=(10,10), 
+                                  gridspec_kw={'hspace':0.125, 
+                                               'wspace':0.125})
+            # 2D plots
+            ## b, m
+            iN = np.argmin(np.abs(Ngrid - mN))
+            axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
+                                Pgrid[:,:,iN], cmap=cmr.ocean_r)
+            axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
+                             Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
+            axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
+                             self.nPgrid/self.nnorm, self.nsigs, 
+                             linestyles=sls, colors='red')
+            axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
+            ## N, m
+            iI = np.argmin(np.abs(bgrid - mI))
+            axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
+                                Pgrid[iI,:,:], cmap=cmr.ocean_r)
+            axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
+                             Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
+            axs[2,1].set(yticklabels=[], xlabel=r"$N$")
+            ## b, N
+            iS = np.argmin(np.abs(mgrid - mS))
+            axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
+                                Pgrid[:,iS,:], cmap=cmr.ocean_r)
+            axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
+                             Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
+            axs[1,0].set(xticklabels=[], ylabel=r"$N$")
+            # 1D histograms
+            ## b
+            axs[0,0].plot(bgrid, np.sum(Pgrid, axis=(1,2)))
+            axs[0,0].set(xticklabels=[], yticks=[], 
+                title=r"$b = {:.4f} \pm {:.4f}$".format(mI, np.sqrt(dI)))
+            ## N
+            axs[1,1].plot(Ngrid, np.sum(Pgrid, axis=(0,1)))
+            axs[1,1].set(xticklabels=[], yticks=[], 
+                title=r"$N = {:.2f} \pm {:.2f}$".format(mN, np.sqrt(dN)))
+            ## m
+            axs[2,2].plot(mgrid, np.sum(Pgrid, axis=(0,2)))
+            axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
+                title=r"$m = {:.2e} \pm {:.2e}$".format(mS, np.sqrt(dS)))
+            # Hide unused axes
+            axs[0,1].axis('off')
+            axs[0,2].axis('off')
+            axs[1,2].axis('off')
+            plt.show()
