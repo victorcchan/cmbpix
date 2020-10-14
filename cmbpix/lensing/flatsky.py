@@ -580,96 +580,118 @@ class FlatSkyLens(LensingEstimator):
         self.sigs = sigs
         sls = [":", "--", "-"]
         if plot == "m" or plot == "marginalized" or plot == "margin":
-            f, axs = plt.subplots(3, 3, figsize=(10,10), 
-                                  gridspec_kw={'hspace':0.125, 
-                                               'wspace':0.125})
-            # 2D plots
-            ## b, m
-            axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
-                                np.sum(Pgrid, axis=2), cmap=cmr.ocean_r)
-            iN = np.argmin(np.abs(Ngrid - mN))
-            axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
-                             Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
-            axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
-                             self.nPgrid/self.nnorm, self.nsigs, 
-                             linestyles=sls, colors='red')
-            axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
-            ## N, m
-            axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
-                                np.sum(Pgrid, axis=0), cmap=cmr.ocean_r)
-            iI = np.argmin(np.abs(bgrid - mI))
-            axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
-                             Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
-            axs[2,1].set(yticklabels=[], xlabel=r"$N$")
-            ## b, N
-            axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
-                                np.sum(Pgrid, axis=1), cmap=cmr.ocean_r)
-            iS = np.argmin(np.abs(mgrid - mS))
-            axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
-                             Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
-            axs[1,0].set(xticklabels=[], ylabel=r"$N$")
-            # 1D histograms
-            ## b
-            axs[0,0].plot(bgrid, np.sum(Pgrid, axis=(1,2)))
-            axs[0,0].set(xticklabels=[], yticks=[], 
-                title=r"$b = {:.4f} \pm {:.4f}$".format(mI, np.sqrt(dI)))
-            ## N
-            axs[1,1].plot(Ngrid, np.sum(Pgrid, axis=(0,1)))
-            axs[1,1].set(xticklabels=[], yticks=[], 
-                title=r"$N = {:.2f} \pm {:.2f}$".format(mN, np.sqrt(dN)))
-            ## m
-            axs[2,2].plot(mgrid, np.sum(Pgrid, axis=(0,2)))
-            axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
-                title=r"$m = {:.2e} \pm {:.2e}$".format(mS, np.sqrt(dS)))
-            # Hide unused axes
-            axs[0,1].axis('off')
-            axs[0,2].axis('off')
-            axs[1,2].axis('off')
-            plt.show()
+            self.PearsonPlotMarginalized()
         if plot == "s" or plot == "sliced" or plot == "slice":
-            f, axs = plt.subplots(3, 3, figsize=(10,10), 
-                                  gridspec_kw={'hspace':0.125, 
-                                               'wspace':0.125})
-            # 2D plots
-            ## b, m
-            iN = np.argmin(np.abs(Ngrid - mN))
-            axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
-                                Pgrid[:,:,iN], cmap=cmr.ocean_r)
-            axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
-                             Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
-            axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
-                             self.nPgrid/self.nnorm, self.nsigs, 
-                             linestyles=sls, colors='red')
-            axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
-            ## N, m
-            iI = np.argmin(np.abs(bgrid - mI))
-            axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
-                                Pgrid[iI,:,:], cmap=cmr.ocean_r)
-            axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
-                             Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
-            axs[2,1].set(yticklabels=[], xlabel=r"$N$")
-            ## b, N
-            iS = np.argmin(np.abs(mgrid - mS))
-            axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
-                                Pgrid[:,iS,:], cmap=cmr.ocean_r)
-            axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
-                             Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
-            axs[1,0].set(xticklabels=[], ylabel=r"$N$")
-            # 1D histograms
-            ## b
-            axs[0,0].plot(bgrid, np.sum(Pgrid, axis=(1,2)))
-            axs[0,0].set(xticklabels=[], yticks=[], 
-                title=r"$b = {:.4f} \pm {:.4f}$".format(mI, np.sqrt(dI)))
-            ## N
-            axs[1,1].plot(Ngrid, np.sum(Pgrid, axis=(0,1)))
-            axs[1,1].set(xticklabels=[], yticks=[], 
-                title=r"$N = {:.2f} \pm {:.2f}$".format(mN, np.sqrt(dN)))
-            ## m
-            axs[2,2].plot(mgrid, np.sum(Pgrid, axis=(0,2)))
-            axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
-                title=r"$m = {:.2e} \pm {:.2e}$".format(mS, np.sqrt(dS)))
-            # Hide unused axes
-            axs[0,1].axis('off')
-            axs[0,2].axis('off')
-            axs[1,2].axis('off')
-            plt.show()
+            self.PearsonPlotSliced()
+
+    def PearsonPlotMarginalized(self):
+        """
+        """
+        pgrid = self.pgrid
+        Pgrid = self.Pgrid
+        sigs = self.sigs
+        f, axs = plt.subplots(3, 3, figsize=(10,10), 
+                              gridspec_kw={'hspace':0.125, 
+                                           'wspace':0.125})
+        # 2D plots
+        ## b, m
+        axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
+                            np.sum(Pgrid, axis=2), cmap=cmr.ocean_r)
+        iN = np.argmin(np.abs(pgrid[0,0,:] - self.pP3[2]))
+        axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
+                         Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
+        axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
+                         self.nPgrid/self.nnorm, self.nsigs, 
+                         linestyles=sls, colors='red')
+        axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
+        ## N, m
+        axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
+                            np.sum(Pgrid, axis=0), cmap=cmr.ocean_r)
+        iI = np.argmin(np.abs(pgrid[:,0,0] - self.pP3[0]))
+        axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
+                         Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
+        axs[2,1].set(yticklabels=[], xlabel=r"$N$")
+        ## b, N
+        axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
+                            np.sum(Pgrid, axis=1), cmap=cmr.ocean_r)
+        iS = np.argmin(np.abs(self.pgrid[:,0,:] - self.pP3[1]))
+        axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
+                         Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
+        axs[1,0].set(xticklabels=[], ylabel=r"$N$")
+        # 1D histograms
+        ## b
+        axs[0,0].plot(pgrid[:,0,0], np.sum(Pgrid, axis=(1,2)))
+        axs[0,0].set(xticklabels=[], yticks=[], 
+            title=r"$b = {:.4f} \pm {:.4f}$".format(self.pP3[0], 
+                                                    np.sqrt(self.dpP3[0])))
+        ## N
+        axs[1,1].plot(pgrid[0,0,:], np.sum(Pgrid, axis=(0,1)))
+        axs[1,1].set(xticklabels=[], yticks=[], 
+            title=r"$N = {:.2f} \pm {:.2f}$".format(self.pP3[2], 
+                                                    np.sqrt(self.dpP3[2])))
+        ## m
+        axs[2,2].plot(self.pgrid[:,0,:], np.sum(Pgrid, axis=(0,2)))
+        axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
+            title=r"$m = {:.2e} \pm {:.2e}$".format(self.pP3[1], 
+                                                    np.sqrt(self.dpP3[1])))
+        # Hide unused axes
+        axs[0,1].axis('off')
+        axs[0,2].axis('off')
+        axs[1,2].axis('off')
+        plt.show()
+
+    def PearsonPlotSliced(self):
+        """
+        """
+        pgrid = self.pgrid
+        Pgrid = self.Pgrid
+        sigs = self.sigs
+        f, axs = plt.subplots(3, 3, figsize=(10,10), 
+                              gridspec_kw={'hspace':0.125, 
+                                           'wspace':0.125})
+        # 2D plots
+        ## b, m
+        iN = np.argmin(np.abs(pgrid[0,0,:] - self.pP3[2]))
+        axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
+                            Pgrid[:,:,iN], cmap=cmr.ocean_r)
+        axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
+                         Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
+        axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
+                         self.nPgrid/self.nnorm, self.nsigs, 
+                         linestyles=sls, colors='red')
+        axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
+        ## N, m
+        iI = np.argmin(np.abs(pgrid[:,0,0] - self.pP3[0]))
+        axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
+                            Pgrid[iI,:,:], cmap=cmr.ocean_r)
+        axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
+                         Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
+        axs[2,1].set(yticklabels=[], xlabel=r"$N$")
+        ## b, N
+        iS = np.argmin(np.abs(self.pgrid[:,0,:] - self.pP3[1]))
+        axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
+                            Pgrid[:,iS,:], cmap=cmr.ocean_r)
+        axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
+                         Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
+        axs[1,0].set(xticklabels=[], ylabel=r"$N$")
+        # 1D histograms
+        ## b
+        axs[0,0].plot(pgrid[:,0,0], np.sum(Pgrid, axis=(1,2)))
+        axs[0,0].set(xticklabels=[], yticks=[], 
+            title=r"$b = {:.4f} \pm {:.4f}$".format(self.pP3[0], 
+                                                    np.sqrt(self.dpP3[0])))
+        ## N
+        axs[1,1].plot(pgrid[0,0,:], np.sum(Pgrid, axis=(0,1)))
+        axs[1,1].set(xticklabels=[], yticks=[], 
+            title=r"$N = {:.2f} \pm {:.2f}$".format(self.pP3[2], 
+                                                    np.sqrt(self.dpP3[2])))
+        ## m
+        axs[2,2].plot(self.pgrid[:,0,:], np.sum(Pgrid, axis=(0,2)))
+        axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
+            title=r"$m = {:.2e} \pm {:.2e}$".format(self.pP3[1], 
+                                                    np.sqrt(self.dpP3[1])))
+        # Hide unused axes
+        axs[0,1].axis('off')
+        axs[0,2].axis('off')
+        axs[1,2].axis('off')
+        plt.show()
