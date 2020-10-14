@@ -639,6 +639,9 @@ class MPIFlatSkyLens(LensingEstimator):
         the likelihood along the N parameter equally amongst the processes. 
         Estimator outputs are stored in the pP3, and errors in the dpP3 
         attributes.
+
+        Currently, only supporting 40 steps in N, so the number of processes 
+        should divide 40 evenly.
         """
         line = np.empty(2)
         dline = np.empty(2)
