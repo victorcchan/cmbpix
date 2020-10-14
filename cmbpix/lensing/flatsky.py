@@ -600,7 +600,16 @@ class FlatSkyLens(LensingEstimator):
             self.PearsonPlotSliced(plotname)
 
     def PearsonPlotMarginalized(self, plotname=None):
-        """
+        """Plot the corner plot for the computed Pearson Type III likelihood.
+
+        Plot the corner plot for the computed Pearson Type III likelihood. 
+        The 2D likelihood ellipses will be marginalized over the remaining 
+        parameter.
+
+        Parameters
+        ----------
+        plotname: str, default=None
+            If given, then save the likelihood corner plot at this location
         """
         pgrid = self.pgrid
         Pgrid = self.Pgrid
@@ -656,7 +665,16 @@ class FlatSkyLens(LensingEstimator):
         plt.show()
 
     def PearsonPlotSliced(self, plotname=None):
-        """
+        """Plot the corner plot for the computed Pearson Type III likelihood.
+
+        Plot the corner plot for the computed Pearson Type III likelihood. 
+        The 2D likelihood ellipses will be slices at the estimated value of 
+        the remaining parameter.
+
+        Parameters
+        ----------
+        plotname: str, default=None
+            If given, then save the likelihood corner plot at this location
         """
         pgrid = self.pgrid
         Pgrid = self.Pgrid
