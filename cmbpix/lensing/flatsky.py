@@ -515,9 +515,10 @@ class FlatSkyLens(LensingEstimator):
         if plot:
             plt.figure(figsize=(12,8))
             try:
-                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm, cmap=cmr.ocean_r)
+                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm, 
+                    cmap=cmr.ocean_r, shading='auto')
             except(NameError):
-                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm)
+                plt.pcolormesh(pgrid[0], pgrid[1], Pgrid/norm, shading='auto')
             plt.colorbar(label=r"Likelihood")
             ncontours = plt.contour(pgrid[0], pgrid[1], Pgrid/norm, nsigs, 
                                     colors='red')
@@ -561,10 +562,11 @@ class FlatSkyLens(LensingEstimator):
                             self.line[1] + 10*np.sqrt(self.dline[1][1]), 
                             200
                            )
-        Ngrid = np.linspace(10, 20, 50)
+        res = self.map_in.shape[-1]
+        Ngrid = np.linspace(10, 30, 100)
         pgrid = np.meshgrid(bgrid, mgrid, Ngrid, indexing='ij')
         self.pgrid = pgrid
-        Pgrid = np.zeros((200,200,50))
+        Pgrid = np.zeros((200,200,100))
         db = bgrid[1] - bgrid[0]
         dm = mgrid[1] - mgrid[0]
         dN = Ngrid[1] - Ngrid[0]
@@ -616,14 +618,16 @@ class FlatSkyLens(LensingEstimator):
         pgrid = self.pgrid
         Pgrid = self.Pgrid
         sigs = self.sigs
+        sls = [":", "--", "-"]
         f, axs = plt.subplots(3, 3, figsize=(10,10), 
                               gridspec_kw={'hspace':0.125, 
                                            'wspace':0.125})
         # 2D plots
         ## b, m
         axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
-                            np.sum(Pgrid, axis=2), cmap=cmr.ocean_r)
-        iN = np.argmin(np.abs(pgrid[0,0,:] - self.pP3[2]))
+                            np.sum(Pgrid, axis=2), cmap=cmr.ocean_r, 
+                            shading='auto')
+        iN = np.argmin(np.abs(pgrid[2][0,0,:] - self.pP3[2]))
         axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
                          Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
         axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
@@ -632,31 +636,33 @@ class FlatSkyLens(LensingEstimator):
         axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
         ## N, m
         axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
-                            np.sum(Pgrid, axis=0), cmap=cmr.ocean_r)
-        iI = np.argmin(np.abs(pgrid[:,0,0] - self.pP3[0]))
+                            np.sum(Pgrid, axis=0), cmap=cmr.ocean_r, 
+                            shading='auto')
+        iI = np.argmin(np.abs(pgrid[0][:,0,0] - self.pP3[0]))
         axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
                          Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
         axs[2,1].set(yticklabels=[], xlabel=r"$N$")
         ## b, N
         axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
-                            np.sum(Pgrid, axis=1), cmap=cmr.ocean_r)
-        iS = np.argmin(np.abs(self.pgrid[:,0,:] - self.pP3[1]))
+                            np.sum(Pgrid, axis=1), cmap=cmr.ocean_r, 
+                            shading='auto')
+        iS = np.argmin(np.abs(self.pgrid[1][0,:,0] - self.pP3[1]))
         axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
                          Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
         axs[1,0].set(xticklabels=[], ylabel=r"$N$")
         # 1D histograms
         ## b
-        axs[0,0].plot(pgrid[:,0,0], np.sum(Pgrid, axis=(1,2)))
+        axs[0,0].plot(pgrid[0][:,0,0], np.sum(Pgrid, axis=(1,2)))
         axs[0,0].set(xticklabels=[], yticks=[], 
             title=r"$b = {:.4f} \pm {:.4f}$".format(self.pP3[0], 
                                                     np.sqrt(self.dpP3[0])))
         ## N
-        axs[1,1].plot(pgrid[0,0,:], np.sum(Pgrid, axis=(0,1)))
+        axs[1,1].plot(pgrid[2][0,0,:], np.sum(Pgrid, axis=(0,1)))
         axs[1,1].set(xticklabels=[], yticks=[], 
             title=r"$N = {:.2f} \pm {:.2f}$".format(self.pP3[2], 
                                                     np.sqrt(self.dpP3[2])))
         ## m
-        axs[2,2].plot(self.pgrid[:,0,:], np.sum(Pgrid, axis=(0,2)))
+        axs[2,2].plot(self.pgrid[1][0,:,0], np.sum(Pgrid, axis=(0,2)))
         axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
             title=r"$m = {:.2e} \pm {:.2e}$".format(self.pP3[1], 
                                                     np.sqrt(self.dpP3[1])))
@@ -681,14 +687,15 @@ class FlatSkyLens(LensingEstimator):
         pgrid = self.pgrid
         Pgrid = self.Pgrid
         sigs = self.sigs
+        sls = [":", "--", "-"]
         f, axs = plt.subplots(3, 3, figsize=(10,10), 
                               gridspec_kw={'hspace':0.125, 
                                            'wspace':0.125})
         # 2D plots
         ## b, m
-        iN = np.argmin(np.abs(pgrid[0,0,:] - self.pP3[2]))
+        iN = np.argmin(np.abs(pgrid[2][0,0,:] - self.pP3[2]))
         axs[2,0].pcolormesh(pgrid[0][:,:,0], pgrid[1][:,:,0], 
-                            Pgrid[:,:,iN], cmap=cmr.ocean_r)
+                            Pgrid[:,:,iN], cmap=cmr.ocean_r, shading='auto')
         axs[2,0].contour(pgrid[0][:,:,iN], pgrid[1][:,:,iN], 
                          Pgrid[:,:,iN], sigs, linestyles=sls, colors='C1')
         axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
@@ -696,32 +703,32 @@ class FlatSkyLens(LensingEstimator):
                          linestyles=sls, colors='red')
         axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
         ## N, m
-        iI = np.argmin(np.abs(pgrid[:,0,0] - self.pP3[0]))
+        iI = np.argmin(np.abs(pgrid[0][:,0,0] - self.pP3[0]))
         axs[2,1].pcolormesh(pgrid[2][0,:,:], pgrid[1][0,:,:], 
-                            Pgrid[iI,:,:], cmap=cmr.ocean_r)
+                            Pgrid[iI,:,:], cmap=cmr.ocean_r, shading='auto')
         axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
                          Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
         axs[2,1].set(yticklabels=[], xlabel=r"$N$")
         ## b, N
-        iS = np.argmin(np.abs(self.pgrid[:,0,:] - self.pP3[1]))
+        iS = np.argmin(np.abs(self.pgrid[1][0,:,0] - self.pP3[1]))
         axs[1,0].pcolormesh(pgrid[0][:,0,:], pgrid[2][:,0,:], 
-                            Pgrid[:,iS,:], cmap=cmr.ocean_r)
+                            Pgrid[:,iS,:], cmap=cmr.ocean_r, shading='auto')
         axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
                          Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
         axs[1,0].set(xticklabels=[], ylabel=r"$N$")
         # 1D histograms
         ## b
-        axs[0,0].plot(pgrid[:,0,0], np.sum(Pgrid, axis=(1,2)))
+        axs[0,0].plot(pgrid[0][:,0,0], np.sum(Pgrid, axis=(1,2)))
         axs[0,0].set(xticklabels=[], yticks=[], 
             title=r"$b = {:.4f} \pm {:.4f}$".format(self.pP3[0], 
                                                     np.sqrt(self.dpP3[0])))
         ## N
-        axs[1,1].plot(pgrid[0,0,:], np.sum(Pgrid, axis=(0,1)))
+        axs[1,1].plot(pgrid[2][0,0,:], np.sum(Pgrid, axis=(0,1)))
         axs[1,1].set(xticklabels=[], yticks=[], 
             title=r"$N = {:.2f} \pm {:.2f}$".format(self.pP3[2], 
                                                     np.sqrt(self.dpP3[2])))
         ## m
-        axs[2,2].plot(self.pgrid[:,0,:], np.sum(Pgrid, axis=(0,2)))
+        axs[2,2].plot(self.pgrid[1][0,:,0], np.sum(Pgrid, axis=(0,2)))
         axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
             title=r"$m = {:.2e} \pm {:.2e}$".format(self.pP3[1], 
                                                     np.sqrt(self.dpP3[1])))
