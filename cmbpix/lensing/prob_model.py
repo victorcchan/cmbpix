@@ -1,5 +1,5 @@
 import numpy as np
-from pystan import StanModel
+from stan import StanModel
 
 lens_code = """
 data {

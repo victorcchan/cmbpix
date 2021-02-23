@@ -1,8 +1,8 @@
 import numpy as np
 import healpy as hp
-import pystan as stan
+#import stan as stan
 from cmbpix.utils import *
-from cmbpix.lensing import prob_model as pm
+#from cmbpix.lensing import prob_model as pm
 
 class LensingEstimator():
 	"""Estimator for small scale lensing in a CMB map.

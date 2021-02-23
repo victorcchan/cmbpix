@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-import pystan as stan
+import stan as stan
 from cmbpix.utils import *
 from cmbpix.lensing.estimator import LensingEstimator
 from cmbpix.lensing import prob_model as pm
