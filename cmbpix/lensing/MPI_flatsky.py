@@ -4,6 +4,7 @@ from cmbpix.utils import *
 from cmbpix.lensing.estimator import LensingEstimator
 from scipy.optimize import curve_fit, fsolve
 from scipy.special import gamma
+from scipy.interpolate import CubicSpline
 import matplotlib.pyplot as plt
 from mpi4py import MPI
 try:
@@ -125,8 +126,9 @@ class MPIFlatSkyLens(LensingEstimator):
     """
 
     def __init__(self, cmbmap, ldT=2000, lmin=3000, lmax=np.inf, 
-                    patchsize=40, comm=None, filt="cos", 
-                    savesteps=False):
+                    patchsize=40, Ns=[10,30], theory=None, 
+                    fiducialCls=None, applyWiener=True, 
+                    comm=None, filt="cos",  savesteps=False):
         """Initiate the estimator.
 
         Parameters
@@ -152,12 +154,16 @@ class MPIFlatSkyLens(LensingEstimator):
         self.comm = comm
         self.commrank = self.comm.Get_rank()
         self.commsize = self.comm.Get_size()
+        self._Ns = Ns
         if self.commrank == 0:
             self.map_in = cmbmap
             self.ldT = ldT
             self.lmin = lmin
             self.lmax = lmax
+            self.fid = fiducialCls
             self._p = patchsize
+            self._th = theory
+            self._aW = applyWiener
             # Derived attributes
             self._ly, self._lx = self.map_in.lmap()
             self._lmod = self.map_in.modlmap()
@@ -221,6 +227,10 @@ class MPIFlatSkyLens(LensingEstimator):
         m_fft = enmap.fft(self.map_in)
         hp = np.zeros(self.map_in.shape)
         hp[np.where((self._lmod > self.lmin) & (self._lmod < self.lmax))] = 1.
+        # Apply pre-whitening or Wiener/inverse variance filters, then top hat
+        if self._aW and self.fid is not None:
+            cs = CubicSpline(self.fid[0], self.fid[1]) # (ell, Cl)
+            m_fft = m_fft / cs(self._lmod)
         self._Tss = enmap.ifft(m_fft * hp)
         self._dTy, self._dTx = gradient_flat(self.map_in, self.ldT)
         # Scale geometry for lower res map of patches
@@ -343,7 +353,8 @@ class MPIFlatSkyLens(LensingEstimator):
         self._T_ord = T_ord
         self._dT_ord = dT_ord
         popt, pcov = curve_fit(_lin, dT_ord, T_ord, 
-                                [1, 1e-10], sigma=T_err, 
+                                [np.mean(T_ord), np.mean(T_ord/dT_ord)], 
+                                sigma=T_err, 
                                 absolute_sigma=True)
         self.line = popt
         self.dline = pcov
@@ -418,7 +429,8 @@ class MPIFlatSkyLens(LensingEstimator):
                 self.cgrid[i,j] = self.chi2line([b, m])
         npatch = self._dT2patch.flatten().size-2
         self.cgrid *= npatch
-        Pgrid = np.exp(-(self.cgrid)/2)
+        offset = np.median(self.cgrid)
+        Pgrid = np.exp(-(self.cgrid-offset)/2)
         self.nPgrid = Pgrid
         norm = np.sum(Pgrid * db * dm)
         mI = np.sum(Pgrid * pgrid[0] * db * dm) / norm
@@ -429,8 +441,8 @@ class MPIFlatSkyLens(LensingEstimator):
         self.dpc2 = np.array([dI, dS])
         nsigs = []
         for i in [3,2,1]:
-            nsigs.append(np.exp(-npatch*
-                                self.chi2line([mI, mS+np.sqrt(dS)*i])/2)/norm)
+            nsigs.append(np.exp(-(npatch*
+                                self.chi2line([mI, mS+np.sqrt(dS)*i])-offset)/2)/norm)
         self.nnorm = norm
         self.nsigs = nsigs
         if plot:
@@ -483,10 +495,10 @@ class MPIFlatSkyLens(LensingEstimator):
                             self.line[1] + 10*np.sqrt(self.dline[1][1]), 
                             200
                            )
-        Ngrid = np.linspace(10, 20, 50)
+        Ngrid = np.linspace(self._Ns[0], self._Ns[1], 100)
         pgrid = np.meshgrid(bgrid, mgrid, Ngrid, indexing='ij')
         self.pgrid = pgrid
-        Pgrid = np.zeros((200,200,50))
+        Pgrid = np.zeros((200,200,100))
         db = bgrid[1] - bgrid[0]
         dm = mgrid[1] - mgrid[0]
         dN = Ngrid[1] - Ngrid[0]
@@ -607,6 +619,7 @@ class MPIFlatSkyLens(LensingEstimator):
         pgrid = self.pgrid
         Pgrid = self.Pgrid
         sigs = self.sigs
+        sls = [":", "--", "-"]
         f, axs = plt.subplots(3, 3, figsize=(10,10), 
                               gridspec_kw={'hspace':0.125, 
                                            'wspace':0.125})
@@ -620,6 +633,9 @@ class MPIFlatSkyLens(LensingEstimator):
         axs[2,0].contour(self.npgrid[0], self.npgrid[1], 
                          self.nPgrid/self.nnorm, self.nsigs, 
                          linestyles=sls, colors='red')
+        if self._th is not None:
+            axs[2,0].axvline(self._th[0], c='k')
+            axs[2,0].axhline(self._th[1], c='k')
         axs[2,0].set(xlabel=r"$b$ [$\mu$K$^2$]", ylabel=r"$m$ [rad$^2$]")
         ## N, m
         iI = np.argmin(np.abs(pgrid[0][:,0,0] - self.pP3[0]))
@@ -627,6 +643,8 @@ class MPIFlatSkyLens(LensingEstimator):
                             Pgrid[iI,:,:], cmap=cmr.ocean_r, shading='auto')
         axs[2,1].contour(pgrid[2][iI,:,:], pgrid[1][iI,:,:], 
                          Pgrid[iI,:,:], sigs, linestyles=sls, colors='C1')
+        if self._th is not None:
+            axs[2,1].axhline(self._th[1], c='k')
         axs[2,1].set(yticklabels=[], xlabel=r"$N$")
         ## b, N
         iS = np.argmin(np.abs(self.pgrid[1][0,:,0] - self.pP3[1]))
@@ -634,12 +652,16 @@ class MPIFlatSkyLens(LensingEstimator):
                             Pgrid[:,iS,:], cmap=cmr.ocean_r, shading='auto')
         axs[1,0].contour(pgrid[0][:,iS,:], pgrid[2][:,iS,:], 
                          Pgrid[:,iS,:], sigs, linestyles=sls, colors='C1')
+        if self._th is not None:
+            axs[1,0].axvline(self._th[0], c='k')
         axs[1,0].set(xticklabels=[], ylabel=r"$N$")
         # 1D histograms
         ## b
         axs[0,0].plot(pgrid[0][:,0,0], np.sum(Pgrid, axis=(1,2)))
+        if self._th is not None:
+            axs[0,0].axvline(self._th[0], c='k')
         axs[0,0].set(xticklabels=[], yticks=[], 
-            title=r"$b = {:.4f} \pm {:.4f}$".format(self.pP3[0], 
+            title=r"$b = {:.2e} \pm {:.2e}$".format(self.pP3[0], 
                                                     np.sqrt(self.dpP3[0])))
         ## N
         axs[1,1].plot(pgrid[2][0,0,:], np.sum(Pgrid, axis=(0,1)))
@@ -648,6 +670,8 @@ class MPIFlatSkyLens(LensingEstimator):
                                                     np.sqrt(self.dpP3[2])))
         ## m
         axs[2,2].plot(self.pgrid[1][0,:,0], np.sum(Pgrid, axis=(0,2)))
+        if self._th is not None:
+            axs[2,2].axvline(self._th[1], c='k')
         axs[2,2].set(yticks=[], xlabel=r"$m$ [rad$^2$]", 
             title=r"$m = {:.2e} \pm {:.2e}$".format(self.pP3[1], 
                                                     np.sqrt(self.dpP3[1])))
@@ -669,8 +693,8 @@ class MPIFlatSkyLens(LensingEstimator):
         Estimator outputs are stored in the pP3, and errors in the dpP3 
         attributes.
 
-        Currently, only supporting 40 steps in N, so the number of processes 
-        should divide 40 evenly.
+        Currently, only supporting 80 steps in N, so the number of processes 
+        should divide 80 evenly.
         """
         line = np.empty(2)
         dline = np.empty(2)
@@ -687,7 +711,7 @@ class MPIFlatSkyLens(LensingEstimator):
                             line[1] + 10*dline[1], 
                             200
                             )
-        Ngrid = np.linspace(10, 20, 40)
+        Ngrid = np.linspace(self._Ns[0], self._Ns[1], 80)
         pgrid = np.meshgrid(bgrid, mgrid, Ngrid, indexing='ij')
         if self.commrank == 0:
             self.pgrid = pgrid
@@ -707,7 +731,7 @@ class MPIFlatSkyLens(LensingEstimator):
         self.comm.Bcast(dT2p, root=0)
         self.comm.Bcast(T2p, root=0)
 
-        subsize = 40 // self.commsize
+        subsize = 80 // self.commsize
         subN = Ngrid[self.commrank*subsize:(self.commrank+1)*subsize]
         subP = np.zeros((subsize,200,200))
         Pgrid = np.zeros((self.commsize,subsize,200,200))
