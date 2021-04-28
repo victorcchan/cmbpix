@@ -2,6 +2,7 @@ import numpy as np
 from pixell import enmap, utils
 from cmbpix.utils import *
 from cmbpix.lensing.estimator import LensingEstimator
+from cmbpix.lensing import *
 from scipy.optimize import curve_fit, fsolve
 from scipy.special import gamma
 from scipy.interpolate import CubicSpline
@@ -52,6 +53,28 @@ def _Pearson3(s2, N=1., sig2=1., *p):
     ans *= s2 ** ((N-3)/2.)
     ans *= np.exp(-N * s2 / (2 * sig2))
     return ans / gamma((N-1) / 2.)
+
+def _logPearson3(s2, N=1., sig2=1., *p):
+    """Return the PDF of the Pearson Type III distribution evaluated at s2.
+    
+    Evaluate the PDF of the Pearson Type III distribution at s2.
+    
+    Parameters
+    ----------
+    s2: value(s)
+        The value(s) at which to evaluate the Pearson III distribution.
+    N: value(s), default=1.
+        The number of independent samples used to estimate s2.
+    sig2: values(s), default=1.
+        The width of the distribution from which the samples of s2 were drawn.
+    """
+    if p:
+        N = p[0]
+        sig2 = p[1]
+    ans = np.log((N / (2 * sig2))) * ((N-1)/2.)
+    ans += np.log(s2) * ((N-3)/2.)
+    ans += (-N * s2 / (2 * sig2))
+    return ans - np.log(gamma((N-1) / 2.))
 
 def _PearsonWidth(vol, xs, N, sig2, *p):
     """Return the band of s2 where the integral of Pearson III is vol.
@@ -126,9 +149,10 @@ class MPIFlatSkyLens(LensingEstimator):
     """
 
     def __init__(self, cmbmap, ldT=2000, lmin=3000, lmax=np.inf, 
-                    patchsize=40, Ns=[10,30], theory=None, 
+                    patchsize=40, Ns=[10,30], theory=None, thcl=None,
                     fiducialCls=None, applyWiener=True, 
-                    comm=None, filt="cos",  savesteps=False):
+                    comm=None, filt="cos",  savesteps=False, 
+                    N1=None, N2=None):
         """Initiate the estimator.
 
         Parameters
@@ -156,19 +180,54 @@ class MPIFlatSkyLens(LensingEstimator):
         self.commsize = self.comm.Get_size()
         self._Ns = Ns
         if self.commrank == 0:
-            self.map_in = cmbmap
+            if N1 is not None and N2 is not None:
+                self.map1 = cmbmap + N1
+                self.map2 = cmbmap + N2
+                # Derived attributes
+                self._ly, self._lx = self.map1.lmap()
+                self._lmod = self.map2.modlmap()
+            else:
+                self.map_in = cmbmap
+                # Derived attributes
+                self._ly, self._lx = self.map_in.lmap()
+                self._lmod = self.map_in.modlmap()
             self.ldT = ldT
             self.lmin = lmin
             self.lmax = lmax
             self.fid = fiducialCls
             self._p = patchsize
-            self._th = theory
+            self._thcl = thcl
             self._aW = applyWiener
-            # Derived attributes
-            self._ly, self._lx = self.map_in.lmap()
-            self._lmod = self.map_in.modlmap()
             self.filter= filt
             self.savesteps = savesteps
+            if theory:
+                self._th = theory
+            elif self._thcl:
+                self._th = self.theory_integral()
+
+    def theory_integral(self):
+        if self.filter == 'cos':
+            ell = np.arange(self._thcl[0].size)
+            inter = np.sum((ell*self._thcl[0])[self.lmin:self.lmax]) \
+                    / (4*np.pi)
+            ell = np.arange(self._thcl[1].size)
+            slope = 3*np.sum((ell**3*self._thcl[1])[self.lmin:self.lmax]) \
+                    / (16*np.pi)
+        elif self.filter == 'cos2':
+            ell = np.arange(self._thcl[0].size)
+            inter = 3*np.sum((ell*self._thcl[0])[self.lmin:self.lmax]) \
+                    / (16*np.pi)
+            ell = np.arange(self._thcl[1].size)
+            slope = 5*np.sum((ell**3*self._thcl[1])[self.lmin:self.lmax]) \
+                    / (32*np.pi)
+        else:
+            ell = np.arange(self._thcl[0].size)
+            inter = np.sum((ell*self._thcl[0])[self.lmin:self.lmax]) \
+                    / (2*np.pi)
+            ell = np.arange(self._thcl[1].size)
+            slope = np.sum((ell**3*self._thcl[1])[self.lmin:self.lmax]) \
+                    / (4*np.pi)
+        return [inter, slope]
 
     def gather_patches_plain(self):
         """Assemble patch statistics relevant to lensing at small scales.
@@ -264,6 +323,77 @@ class MPIFlatSkyLens(LensingEstimator):
         if not self.savesteps:
             del self._dTypatch, self._dTxpatch, self._dTy, self._dTx, self._Tss
             del self._T_sub
+
+    def gather_covpatches(self):
+        """Assemble patch statistics for small scale lensing with cos filter.
+        
+        Compute the small scale (ell > 3000) temperature power at different 
+        patches across the sky as well as the average amplitude of the 
+        background temperature gradient (ell < 2000). For the small scale 
+        statistics, also apply a filter in Fourier space such that:
+
+        .. math::
+            f_\\ell = \\cos(\\hat{\\ell}\\cdot\\hat{\\nabla T})
+
+        """
+        self._edge = 5 # Edge pixels to throw away
+        p = self._p
+        m_fft1 = enmap.fft(self.map1)
+        m_fft2 = enmap.fft(self.map2)
+        hp = np.zeros(self.map1.shape)
+        hp[np.where((self._lmod > self.lmin) & (self._lmod < self.lmax))] = 1.
+        # Apply pre-whitening or Wiener/inverse variance filters, then top hat
+        if self._aW and self.fid is not None:
+            cs = CubicSpline(self.fid[0], self.fid[1]) # (ell, Cl)
+            m_fft1 = m_fft1 / cs(self._lmod)
+            m_fft2 = m_fft2 / cs(self._lmod)
+        self._Tss1 = enmap.ifft(m_fft1 * hp)
+        self._Tss2 = enmap.ifft(m_fft2 * hp)
+        self._dTy, self._dTx = gradient_flat(self.map1, self.ldT)
+        # Scale geometry for lower res map of patches
+        pshp, pwcs = enmap.scale_geometry(self.map1.shape, 
+                                            self.map1.wcs, 1./self._p)
+        if not self.savesteps:
+            del self.map1, m_fft1, self.map2, m_fft2
+        self._T2patch = enmap.zeros(pshp, pwcs)
+        self._dTxpatch = enmap.zeros(pshp, pwcs)
+        self._dTypatch = enmap.zeros(pshp, pwcs)
+        self._T_sub1 = np.zeros((pshp[-2], pshp[-1], p, p))
+        self._T_sub2 = np.zeros((pshp[-2], pshp[-1], p, p))
+        for i in range(self._T2patch.shape[-2]):
+            for j in range(self._T2patch.shape[-1]):
+                self._dTypatch[i,j] = np.mean(self._dTy[i*p:(i+1)*p, 
+                                                        j*p:(j+1)*p])
+                self._dTxpatch[i,j] = np.mean(self._dTx[i*p:(i+1)*p, 
+                                                        j*p:(j+1)*p])
+                Tp1 = self._Tss1[i*p:(i+1)*p,j*p:(j+1)*p]
+                Tp2 = self._Tss2[i*p:(i+1)*p,j*p:(j+1)*p]
+                lsuby, lsubx = Tp1.lmap()
+                lsubmod = Tp1.modlmap()
+                lsubmod[0,0] = 1.
+                if self.filter == 'cos':
+                    fl = 1.j*(lsubx*self._dTxpatch[i,j] + \
+                            lsuby*self._dTypatch[i,j]) / \
+                            (lsubmod * np.sqrt(self._dTxpatch[i,j]**2 + \
+                                                self._dTypatch[i,j]**2))
+                elif self.filter=='cos2':
+                    fl = (lsubx*self._dTxpatch[i,j] + \
+                        lsuby*self._dTypatch[i,j])**2 / \
+                        (lsubmod * np.sqrt(self._dTxpatch[i,j]**2 + \
+                                            self._dTypatch[i,j]**2))**2
+                else:
+                    fl = np.ones(lsubx.shape)
+                fl[0,0] = 0.
+                self._T_sub1[i,j,:,:] = enmap.ifft(enmap.fft(Tp1)*fl).real
+                self._T_sub2[i,j,:,:] = enmap.ifft(enmap.fft(Tp2)*fl).real
+                # Throw away pixels with edge effects
+                self._T2patch[i,j] = np.cov(self._T_sub1[i,j,5:-5,5:-5].flatten(), 
+                                            self._T_sub2[i,j,5:-5,5:-5].flatten())[0,1]
+        self._dT2patch = self._dTxpatch**2 + self._dTypatch**2
+        # self._T2patch = np.abs(self._T2patch)
+        if not self.savesteps:
+            del self._dTypatch, self._dTxpatch, self._dTy, self._dTx
+            del self._T_sub1, self._T_sub2, self._Tss1, self._Tss2
 
     def gather_patches_cos2(self):
         """Assemble patch statistics for small scale lensing with cos^2 filter.
@@ -374,7 +504,7 @@ class MPIFlatSkyLens(LensingEstimator):
             plt.ylabel(r"$\sigma_T^2~[\mu{\rm K}^2]$")
             plt.tight_layout()
             if filename is not None:
-                plt.savefig(str(filename), transparent=True)
+                plt.savefig(str(filename))
             plt.show()
             plt.close()
 
@@ -398,7 +528,7 @@ class MPIFlatSkyLens(LensingEstimator):
         chi2 = np.sum(diff**2 / self._T_err**2)
         return chi2 / (self._T_ord.size - 2)
 
-    def chi2grid(self, plot=False):
+    def chi2grid(self, plot=False, filename=None):
         """Compute the grid of reduced chi2 values around the fitted space.
 
         Compute the grid of reduced chi2 values for the space +/- 5 sigma 
@@ -409,6 +539,8 @@ class MPIFlatSkyLens(LensingEstimator):
         ----------
         plot: bool, default=False
             If True, generate a 2D plot of the grid of reduced chi2 values.
+        filename: str, default=None
+            If given, save the plot at this location.
         """
 
         bgrid = np.linspace(self.line[0] - 5*np.sqrt(self.dline[0][0]), 
@@ -460,10 +592,12 @@ class MPIFlatSkyLens(LensingEstimator):
             for l, s in zip(ncontours.levels, strs):
                 fmt[l] = s
             plt.clabel(ncontours, fmt=fmt, inline=True, fontsize=20)
-            plt.axvline(self.line[0], c='k')
-            plt.axhline(self.line[1], c='k')
+            plt.axvline(self._th[0], c='k')
+            plt.axhline(self._th[1], c='k')
             plt.xlabel(r"Intercept [$\mu$K$^2$]")
             plt.ylabel(r"Slope [rad$^2$]")
+            if filename is not None:
+                plt.savefig(filename)
             plt.show()
             plt.close()
 
@@ -503,13 +637,18 @@ class MPIFlatSkyLens(LensingEstimator):
         dm = mgrid[1] - mgrid[0]
         dN = Ngrid[1] - Ngrid[0]
         dT2p = self._dT2patch.flatten()
-        T2p = self._T2patch.flatten()
+        T2p = np.abs(self._T2patch.flatten())
         for k, N in enumerate(Ngrid):
-            Pgrid[:,:,k] = np.sum(np.log(_Pearson3(T2p[None,None,...], N, 
-                                                   _lin(dT2p, 
-                                                   *[pgrid[0][:,:,k][...,None], 
-                                                     pgrid[1][:,:,k][...,None]]
-                                                        ))), axis=2)
+            Pgrid[:,:,k] = np.sum(_logPearson3(T2p[None,None,...], N, 
+                                              np.abs(_lin(dT2p, 
+                                              *[pgrid[0][:,:,k][...,None], 
+                                                pgrid[1][:,:,k][...,None]]
+                                                   ))), axis=2)
+            # Pgrid[:,:,k] = np.sum(np.log(_Pearson3(T2p[None,None,...], N, 
+            #                                        _lin(dT2p, 
+            #                                        *[pgrid[0][:,:,k][...,None], 
+            #                                          pgrid[1][:,:,k][...,None]]
+            #                                             ))), axis=2)
         Pmean = np.mean(Pgrid)
         Pgrid = np.exp(Pgrid-Pmean)
         norm = np.sum(Pgrid * db * dm * dN)
@@ -724,7 +863,7 @@ class MPIFlatSkyLens(LensingEstimator):
         self.comm.Bcast(npatch, root=0)
         if self.commrank == 0:
             dT2p = self._dT2patch.flatten()
-            T2p = self._T2patch.flatten()
+            T2p = np.abs(self._T2patch.flatten())
         else:
             dT2p = np.empty(npatch)
             T2p = np.empty(npatch)
@@ -737,11 +876,11 @@ class MPIFlatSkyLens(LensingEstimator):
         Pgrid = np.zeros((self.commsize,subsize,200,200))
 
         for k, N in enumerate(subN):
-            subP[k,:,:] = np.sum(np.log(_Pearson3(T2p[None,None,...], N, 
-                                                  _lin(dT2p, 
-                                                  *[pgrid[0][:,:,k][...,None], 
-                                                    pgrid[1][:,:,k][...,None]]
-                                                      ))), axis=2)
+            subP[k,:,:] = np.sum(_logPearson3(T2p[None,None,...], N, 
+                                              np.abs(_lin(np.abs(dT2p), 
+                                              *[pgrid[0][:,:,k][...,None], 
+                                                pgrid[1][:,:,k][...,None]]
+                                                   ))), axis=2)
         self.comm.Gather(subP, Pgrid, root=0)
         if self.commrank == 0:
             Pgrid = np.concatenate(Pgrid, axis=0)
