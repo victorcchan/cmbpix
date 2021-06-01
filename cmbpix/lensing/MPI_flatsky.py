@@ -904,3 +904,74 @@ class MPIFlatSkyLens(LensingEstimator):
                 P = np.sum(np.log(_Pearson3(T2p, mN, _lin(dT2p, *cline))))
                 sigs.append(np.exp(P - Pmean)/norm)
             self.sigs = sigs
+
+    def gather_covMPI(self):
+        """Assemble patch statistics for small scale lensing with cos filter.
+        
+        Compute the small scale (ell > 3000) temperature power at different 
+        patches across the sky as well as the average amplitude of the 
+        background temperature gradient (ell < 2000). For the small scale 
+        statistics, also apply a filter in Fourier space such that:
+
+        .. math::
+            f_\\ell = \\cos(\\hat{\\ell}\\cdot\\hat{\\nabla T})
+
+        """
+        self._edge = 5 # Edge pixels to throw away
+        p = self._p
+        m_fft1 = enmap.fft(self.map1)
+        m_fft2 = enmap.fft(self.map2)
+        hp = np.zeros(self.map1.shape)
+        hp[np.where((self._lmod > self.lmin) & (self._lmod < self.lmax))] = 1.
+        # Apply pre-whitening or Wiener/inverse variance filters, then top hat
+        if self._aW and self.fid is not None:
+            cs = CubicSpline(self.fid[0], self.fid[1]) # (ell, Cl)
+            m_fft1 = m_fft1 / cs(self._lmod)
+            m_fft2 = m_fft2 / cs(self._lmod)
+        self._Tss1 = enmap.ifft(m_fft1 * hp)
+        self._Tss2 = enmap.ifft(m_fft2 * hp)
+        self._dTy, self._dTx = gradient_flat(self.map1, self.ldT)
+        # Scale geometry for lower res map of patches
+        pshp, pwcs = enmap.scale_geometry(self.map1.shape, 
+                                            self.map1.wcs, 1./self._p)
+        if not self.savesteps:
+            del self.map1, m_fft1, self.map2, m_fft2
+        self._T2patch = enmap.zeros(pshp, pwcs)
+        self._dTxpatch = enmap.zeros(pshp, pwcs)
+        self._dTypatch = enmap.zeros(pshp, pwcs)
+        self._T_sub1 = np.zeros((pshp[-2], pshp[-1], p, p))
+        self._T_sub2 = np.zeros((pshp[-2], pshp[-1], p, p))
+        for i in range(self._T2patch.shape[-2]):
+            for j in range(self._T2patch.shape[-1]):
+                self._dTypatch[i,j] = np.mean(self._dTy[i*p:(i+1)*p, 
+                                                        j*p:(j+1)*p])
+                self._dTxpatch[i,j] = np.mean(self._dTx[i*p:(i+1)*p, 
+                                                        j*p:(j+1)*p])
+                Tp1 = self._Tss1[i*p:(i+1)*p,j*p:(j+1)*p]
+                Tp2 = self._Tss2[i*p:(i+1)*p,j*p:(j+1)*p]
+                lsuby, lsubx = Tp1.lmap()
+                lsubmod = Tp1.modlmap()
+                lsubmod[0,0] = 1.
+                if self.filter == 'cos':
+                    fl = 1.j*(lsubx*self._dTxpatch[i,j] + \
+                            lsuby*self._dTypatch[i,j]) / \
+                            (lsubmod * np.sqrt(self._dTxpatch[i,j]**2 + \
+                                                self._dTypatch[i,j]**2))
+                elif self.filter=='cos2':
+                    fl = (lsubx*self._dTxpatch[i,j] + \
+                        lsuby*self._dTypatch[i,j])**2 / \
+                        (lsubmod * np.sqrt(self._dTxpatch[i,j]**2 + \
+                                            self._dTypatch[i,j]**2))**2
+                else:
+                    fl = np.ones(lsubx.shape)
+                fl[0,0] = 0.
+                self._T_sub1[i,j,:,:] = enmap.ifft(enmap.fft(Tp1)*fl).real
+                self._T_sub2[i,j,:,:] = enmap.ifft(enmap.fft(Tp2)*fl).real
+                # Throw away pixels with edge effects
+                self._T2patch[i,j] = np.cov(self._T_sub1[i,j,5:-5,5:-5].flatten(), 
+                                            self._T_sub2[i,j,5:-5,5:-5].flatten())[0,1]
+        self._dT2patch = self._dTxpatch**2 + self._dTypatch**2
+        # self._T2patch = np.abs(self._T2patch)
+        if not self.savesteps:
+            del self._dTypatch, self._dTxpatch, self._dTy, self._dTx
+            del self._T_sub1, self._T_sub2, self._Tss1, self._Tss2
