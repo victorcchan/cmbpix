@@ -151,7 +151,7 @@ class MPIFlatSkyLens(LensingEstimator):
     def __init__(self, cmbmap, ldT=2000, lmin=3000, lmax=np.inf, 
                     patchsize=40, Ns=[10,30], theory=None, thcl=None,
                     fiducialCls=None, applyWiener=True, 
-                    comm=None, filt="cos",  savesteps=False, 
+                    comm=None, filt="cos", border=5,  savesteps=False, 
                     N1=None, N2=None):
         """Initiate the estimator.
 
@@ -200,6 +200,7 @@ class MPIFlatSkyLens(LensingEstimator):
             self._aW = applyWiener
             self.filter= filt
             self.savesteps = savesteps
+            self._b = border
             if theory:
                 self._th = theory
             elif self._thcl:
@@ -360,12 +361,13 @@ class MPIFlatSkyLens(LensingEstimator):
         self._dTypatch = enmap.zeros(pshp, pwcs)
         self._T_sub1 = np.zeros((pshp[-2], pshp[-1], p, p))
         self._T_sub2 = np.zeros((pshp[-2], pshp[-1], p, p))
+        b = self._b
         for i in range(self._T2patch.shape[-2]):
             for j in range(self._T2patch.shape[-1]):
-                self._dTypatch[i,j] = np.mean(self._dTy[i*p:(i+1)*p, 
-                                                        j*p:(j+1)*p])
-                self._dTxpatch[i,j] = np.mean(self._dTx[i*p:(i+1)*p, 
-                                                        j*p:(j+1)*p])
+                self._dTypatch[i,j] = np.mean(self._dTy[i*p+b:(i+1)*p-b, 
+                                                        j*p+b:(j+1)*p-b])
+                self._dTxpatch[i,j] = np.mean(self._dTx[i*p+b:(i+1)*p-b, 
+                                                        j*p+b:(j+1)*p-b])
                 Tp1 = self._Tss1[i*p:(i+1)*p,j*p:(j+1)*p]
                 Tp2 = self._Tss2[i*p:(i+1)*p,j*p:(j+1)*p]
                 lsuby, lsubx = Tp1.lmap()
@@ -387,8 +389,8 @@ class MPIFlatSkyLens(LensingEstimator):
                 self._T_sub1[i,j,:,:] = enmap.ifft(enmap.fft(Tp1)*fl).real
                 self._T_sub2[i,j,:,:] = enmap.ifft(enmap.fft(Tp2)*fl).real
                 # Throw away pixels with edge effects
-                self._T2patch[i,j] = np.cov(self._T_sub1[i,j,5:-5,5:-5].flatten(), 
-                                            self._T_sub2[i,j,5:-5,5:-5].flatten())[0,1]
+                self._T2patch[i,j] = np.cov(self._T_sub1[i,j,b:-b,b:-b].flatten(), 
+                                            self._T_sub2[i,j,b:-b,b:-b].flatten())[0,1]
         self._dT2patch = self._dTxpatch**2 + self._dTypatch**2
         # self._T2patch = np.abs(self._T2patch)
         if not self.savesteps:
