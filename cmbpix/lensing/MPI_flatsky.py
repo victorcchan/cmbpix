@@ -359,6 +359,8 @@ class MPIFlatSkyLens(LensingEstimator):
         self._T2patch = enmap.zeros(pshp, pwcs)
         self._dTxpatch = enmap.zeros(pshp, pwcs)
         self._dTypatch = enmap.zeros(pshp, pwcs)
+        self._dTxspread = enmap.zeros(pshp, pwcs)
+        self._dTyspread = enmap.zeros(pshp, pwcs)
         self._T_sub1 = np.zeros((pshp[-2], pshp[-1], p, p))
         self._T_sub2 = np.zeros((pshp[-2], pshp[-1], p, p))
         b = self._b
@@ -367,6 +369,10 @@ class MPIFlatSkyLens(LensingEstimator):
                 self._dTypatch[i,j] = np.mean(self._dTy[i*p+b:(i+1)*p-b, 
                                                         j*p+b:(j+1)*p-b])
                 self._dTxpatch[i,j] = np.mean(self._dTx[i*p+b:(i+1)*p-b, 
+                                                        j*p+b:(j+1)*p-b])
+                self._dTyspread[i,j] = np.std(self._dTy[i*p+b:(i+1)*p-b, 
+                                                        j*p+b:(j+1)*p-b])
+                self._dTxspread[i,j] = np.std(self._dTx[i*p+b:(i+1)*p-b, 
                                                         j*p+b:(j+1)*p-b])
                 Tp1 = self._Tss1[i*p:(i+1)*p,j*p:(j+1)*p]
                 Tp2 = self._Tss2[i*p:(i+1)*p,j*p:(j+1)*p]
@@ -389,12 +395,18 @@ class MPIFlatSkyLens(LensingEstimator):
                 self._T_sub1[i,j,:,:] = enmap.ifft(enmap.fft(Tp1)*fl).real
                 self._T_sub2[i,j,:,:] = enmap.ifft(enmap.fft(Tp2)*fl).real
                 # Throw away pixels with edge effects
-                self._T2patch[i,j] = np.cov(self._T_sub1[i,j,b:-b,b:-b].flatten(), 
-                                            self._T_sub2[i,j,b:-b,b:-b].flatten())[0,1]
+                if b == 0:
+                    T1 = self._T_sub1[i,j].flatten()
+                    T2 = self._T_sub2[i,j].flatten()
+                else:
+                    T1 = self._T_sub1[i,j,b:-b,b:-b].flatten()
+                    T2 = self._T_sub2[i,j,b:-b,b:-b].flatten()
+                self._T2patch[i,j] = np.cov(T1, T2)[0,1]
         self._dT2patch = self._dTxpatch**2 + self._dTypatch**2
         # self._T2patch = np.abs(self._T2patch)
         if not self.savesteps:
             del self._dTypatch, self._dTxpatch, self._dTy, self._dTx
+            del self._dTyspread, self._dTxspread
             del self._T_sub1, self._T_sub2, self._Tss1, self._Tss2
 
     def gather_patches_cos2(self):
