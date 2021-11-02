@@ -169,7 +169,7 @@ def l2integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def l1integral(l1xv, l1yv, l1y, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal, 
+def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal, 
     Clphiphi = None, l1min = 6000, l1max = 8000, l2min = 30, l2max = 3000):
 
     #Add axes in order to vectorize integral
@@ -181,7 +181,7 @@ def l1integral(l1xv, l1yv, l1y, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     #print(np.shape(L))
     
     l1dotl1minusL = l1xv*(l1xv-L)+l1yv*l1yv
-    modl1 = np.sqrt(l1xv**2+l1y**2)
+    modl1 = np.sqrt(l1xv**2+l1yv**2)
     modLminusl1 = np.sqrt((L-l1xv)**2 + l1yv**2)
     
     maskl1 = np.ones(np.shape(modl1),dtype = int)
