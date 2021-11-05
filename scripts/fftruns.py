@@ -1,8 +1,5 @@
 from mpi4py import MPI
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-from vplot import vpresplotbow
 from pixell import enmap, utils, lensing
 from cmbpix.utils import *
 from cmbpix.lensing import fftest as fe
