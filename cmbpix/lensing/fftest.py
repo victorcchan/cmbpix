@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pixell import enmap, utils as putils
-from cmbpix.utils import *
+#from cmbpix.utils import *
 from orphics.maps import binned_power, FourierCalc
 from orphics.stats import bin2D
 import symlens as s
