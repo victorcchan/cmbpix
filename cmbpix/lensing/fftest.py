@@ -10,8 +10,8 @@ from scipy.interpolate import CubicSpline
 def ApplyFilter(map_in, Fl):
     return enmap.ifft(enmap.fft(map_in)*Fl).real
 
-def WienerFilter(map_in, ells, lCls, Nls, lmin, lmax, grad=False):
-    cs = CubicSpline(ells, lCls / (lCls + Nls))
+def WienerFilter(map_in, ells, uCls, lCls, Nls, lmin, lmax, grad=False):
+    cs = CubicSpline(ells, uCls / (lCls + Nls))
     lmap = map_in.modlmap()
     fl = cs(lmap)
     fl[(lmap < lmin) | (lmap > lmax)] = 0.
@@ -266,7 +266,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
         Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(sg*np.pi/180./60.)**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
-    Tlp = WienerFilter(map_in, ell, lCls, Nls, lmin=0, lmax=ldT, grad=True)
+    Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=0, lmax=ldT, grad=True)
     G = Tlp[0]**2 + Tlp[1]**2
     Thp = InvVarFilter(map_in, ell, lCls, Nls, lmin, lmax, grad=True)
     K = Thp[0]**2 + Thp[1]**2
