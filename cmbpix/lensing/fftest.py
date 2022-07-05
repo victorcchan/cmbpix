@@ -245,10 +245,10 @@ def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin):
     Phi = np.zeros(np.shape(Lv)[0])
 
     for iL, LL in enumerate(Lv):
-        AL[iL] = 1./l1integral(l1xv, l1yv, l1y, [LL], l2xv, l2yv, 
+        AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
             uCls, tCls, Clphiphi = None, 
             l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
-        Phi[iL] = l1integral(l1xv, l1yv, l1y, [LL], l2xv, l2yv, 
+        Phi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
             uCls, tCls, Clphiphi = Clpp, 
             l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
 
