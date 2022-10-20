@@ -6,6 +6,7 @@ from orphics.maps import binned_power, FourierCalc
 from orphics.stats import bin2D
 import symlens as s
 from scipy.interpolate import CubicSpline
+from cmbpix.lensing.SCALE_c import Psi_and_A_cy
 
 def ApplyFilter(map_in, Fl):
     return enmap.ifft(enmap.fft(map_in)*Fl).real
@@ -218,18 +219,8 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin):
-    nl1x, nl1y = (200, 200)
-    l1x = np.linspace(-l1max, l1max, nl1x)
-    l1y = np.linspace(-l1max, l1max, nl1y)
-    l1xv, l1yv = np.meshgrid(l1x, l1y, sparse=True)  # make sparse output arrays
-
-    ## Turnover of Phi(L) seems to depend on choice of sampling here
-    ## Increase for better precision at cost of speed and memory usage
-    nl2x, nl2y = (40, 40)
-    l2x = np.linspace(-l2max, l2max, nl2x)
-    l2y = np.linspace(-l2max, l2max, nl2y)
-    l2xv, l2yv = np.meshgrid(l2x, l2y, sparse=True)  # make sparse output arrays
+def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin, 
+    dl1=100, dl2=100, useC=True):
 
     # nL = l2max // lbins
     # Lmax = l2max
@@ -244,13 +235,30 @@ def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin):
     AL = np.zeros(np.shape(Lv)[0])
     Phi = np.zeros(np.shape(Lv)[0])
 
-    for iL, LL in enumerate(Lv):
-        AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-            uCls, tCls, Clphiphi = None, 
-            l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
-        Phi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-            uCls, tCls, Clphiphi = Clpp, 
-            l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
+    if useC:
+        print("Using Cython implementation", flush=True)
+        for iL, LL in enumerate(Lv):
+            Phi[iL], AL[iL] = Psi_and_A_cy(LL, uCls, tCls, Clpp, l1min, l1max, 
+                l2min, l2max, dl1, dl2)
+    else:
+        nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
+        l1x = np.linspace(-l1max, l1max, nl1x)
+        l1y = np.linspace(-l1max, l1max, nl1y)
+        l1xv, l1yv = np.meshgrid(l1x, l1y, sparse=True)  # make sparse output arrays
+
+        ## Turnover of Phi(L) seems to depend on choice of sampling here
+        ## Increase for better precision at cost of speed and memory usage
+        nl2x, nl2y = (2*l2max//dl2, 2*l2max//dl2)
+        l2x = np.linspace(-l2max, l2max, nl2x)
+        l2y = np.linspace(-l2max, l2max, nl2y)
+        l2xv, l2yv = np.meshgrid(l2x, l2y, sparse=True)  # make sparse output arrays
+        for iL, LL in enumerate(Lv):
+            AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
+                uCls, tCls, Clphiphi = None, 
+                l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
+            Phi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
+                uCls, tCls, Clphiphi = Clpp, 
+                l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
 
     return Lv, AL, Phi
 
