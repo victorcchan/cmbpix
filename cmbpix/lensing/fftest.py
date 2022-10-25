@@ -263,7 +263,7 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
     return Lv, AL, Psi
 
 def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50, 
-           uCls=None, lCls=None, Nls=None, Clpp=None, w=0., sg=0., 
+           uCls=None, lCls=None, Nls=None, Clpp=None, w=0., b=0., 
            compute_bias=False):
     """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
 
@@ -305,7 +305,7 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     w: float, default=0.
         The white-noise level (in uK-arcmin) for computation of Nl if no 
         Nls are given.
-    sg: float, default=0.
+    b: float, default=0.
         The beam FWHM (in arcmin) for computation of Nl if no Nls are 
         given.
     compute_bias: bool, default=False
@@ -330,7 +330,7 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
         lCls = np.ones(l1max)
     ell = np.arange(len(lCls), dtype=np.float64)
     if Nls is None:
-        Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(sg*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
+        Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
     Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=l2min, lmax=l2max, grad=True)
