@@ -264,74 +264,85 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
 
 def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50, 
            uCls=None, lCls=None, Nls=None, Clpp=None, w=0., sg=0., 
-           apply_bias=False, plots=None, show_horn=False):
+           compute_bias=False):
+    """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
+
+    Perform the SCALE estimator for small-scale CMB lensing on map_in. 
+    In general, this function pre-processes map_in according to the other 
+    parameters in two different ways, and computes the cross-spectrum of 
+    these two products. Multipole limits for filtering are set by ldT, lmin, 
+    and lmax. Options are available to provide fiducial power spectra for 
+    filtering. Also numerically computes the normalization factor A_Lcheck 
+    and the expected Psi_Lcheck from theory if compute_bias is selected.
+
+    Parameters
+    ----------
+    map_in: nd_map (pixell.enmap)
+        The _flat-sky_ CMB map to apply the SCALE method to.
+    ldT: int, default=3000
+        The upper limit to the low-pass filter, corresponding to l2.
+    lmin: int, default=6000
+        The lower limit to the high-pass filter, corrsponding to l1.
+    lmax: int, default=10000
+        The upper limit to the high-pass filter, corresponding to l1.
+    lbins: int, default=50
+        The size of Lcheck bins in the output.
+    uCls: 1d-array, default=None
+        A fiducial unlensed CMB temperature power spectrum for filtering.
+        If None, no filter is applied.
+    lCls: 1d-array, default=None
+        A fiducial lensed CMB temperature power specturm for filtering.
+        If None, no filter is applied.
+    Nls: 1d-array, default=None
+        A fiducial CMB temperature noise spectrum for filtering.
+        If None, a set of Nls are computed with w, sg.
+    Clpp: 1d-array, default=None
+        A fiducial lensing potential (phiphi) power spectrum. Required if 
+        compute_bias=True.
+    w: float, default=0.
+        The white-noise level (in uK-arcmin) for computation of Nl if no 
+        Nls are given.
+    sg: float, default=0.
+        The beam FWHM (in arcmin) for computation of Nl if no Nls are 
+        given.
+    compute_bias: bool, default=False
+        If True, return also the numerically computed normalization factors 
+        A_Lcheck as well as the expected Psi_Lcheck spectrum. This option 
+        requires inputs for uCl, lCl, and Clpp.
+    
+    Returns
+    -------
+    Lcheck: 1d-array
+        The centers of the Lcheck bins of the other outputs.
+    CLls: 1d-array
+        The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
+    AL: 1d-array
+        The normalization for CLls such that Psi_Lcheck = AL*CLls.
+    Psi: 1d-array
+        The expected theory values for Psi_Lcheck at the same each bin center.
+    """
     if uCls is None:
         uCls = np.ones(lmax)
     if lCls is None:
         lCls = np.ones(lmax)
     ell = np.arange(len(lCls), dtype=np.float64)
     if Nls is None:
-        Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(sg*np.pi/180./60.)**2)
+        Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(sg*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
     Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=0, lmax=ldT, grad=True)
-    G = Tlp[0]**2 + Tlp[1]**2
+    lam = Tlp[0]**2 + Tlp[1]**2
     Thp = InvVarFilter(map_in, ell, lCls, Nls, lmin, lmax, grad=True)
-    K = Thp[0]**2 + Thp[1]**2
+    sig = Thp[0]**2 + Thp[1]**2
     fc = FourierCalc(shape, wcs)
-    p2d,_,_ = fc.power2d(G, K)
+    p2d,_,_ = fc.power2d(lam, sig) # 2D cross-spectrum between lambda & sigma maps
     B = 10000 // lbins + 1
     bins = np.arange(B) * lbins
     binner = bin2D(lmap,bins)
-    cents, p1d = binner.bin(p2d)
-    if apply_bias:
-        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, lmin, lmax, 0, ldT, cents[cents<ldT])
-        if plots == 'all':
-            plt.figure(figsize=(8,6))
-            plt.semilogy(c, AL)
-            plt.xlabel(r'$L$')
-            plt.ylabel(r'$A(L)$')
-            plt.tight_layout()
-            plt.show()
-            plt.close()
-            plt.figure(figsize=(8,6))
-            plt.semilogy(c, Psi)
-            plt.xlabel(r'$L$')
-            plt.ylabel(r'$\Psi(L)$')
-            plt.tight_layout()
-            plt.show()
-            plt.close()    
-    #     abplot = False
-    #     if plots == 'all':
-    #         abplot = True
-    #     c, AL, BL = CalcBias(shape, wcs, ell, ldT, lmin, lmax, bins[bins<=ldT], 
-    #              lCls, Nls, w, sg, Clpp, plots=abplot)
-    # if Clpp is not None:
-    #     phiplot = False
-    #     if plots == 'all':
-    #         phiplot = True
-    #     Psi = CalcExp(shape, wcs, lCls, w, sg, Clpp, ldT, lmin, lmax, bins[bins<=ldT], plots=phiplot)
-    if plots:
-        plt.figure(figsize=(8,6))
-        plt.plot(cents, p1d)
-        plt.axhline(0, c='k', ls=':')
-        plt.xlabel(r"$L$")
-        plt.ylabel(r"$C_L^{GK}$")
-        plt.tight_layout()
-        plt.show()
-        plt.figure(figsize=(8,6))
-        plt.plot(cents[cents<ldT], p1d[cents<ldT] * AL)
-        plt.axhline(0, c='k', ls=':')
-        if Clpp is not None:
-            plt.plot(c, Psi, c='k', ls=':')
-            if show_horn:
-                plt.fill_between(cents[cents<ldT], ex-2*np.sqrt(AL), 
-                                 ex+2*np.sqrt(AL), alpha=0.5)
-        plt.xlabel(r"$L$")
-        plt.ylabel(r"$C_L^{GK}$")
-        plt.tight_layout()
-        plt.show()
-    if apply_bias and Clpp is not None:
-        return cents, p1d, AL, Psi
+    Lcheck, CLls = binner.bin(p2d)
+    if compute_bias:
+        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, lmin, lmax, 0, ldT, Lcheck[Lcheck<ldT])
+    if compute_bias and Clpp is not None:
+        return Lcheck, CLls, AL, Psi
     else:
-        return cents, p1d
+        return Lcheck, CLls
