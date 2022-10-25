@@ -219,7 +219,7 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin, 
+def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin, 
     dl1=100, dl2=100, useC=True):
 
     # nL = l2max // lbins
@@ -233,12 +233,12 @@ def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
     ## Loop is a bit slower than vectorized calculation, but memory savings is factor of nL
 
     AL = np.zeros(np.shape(Lv)[0])
-    Phi = np.zeros(np.shape(Lv)[0])
+    Psi = np.zeros(np.shape(Lv)[0])
 
     if useC:
         print("Using Cython implementation", flush=True)
         for iL, LL in enumerate(Lv):
-            Phi[iL], AL[iL] = Psi_and_A_cy(LL, uCls, tCls, Clpp, l1min, l1max, 
+            Psi[iL], AL[iL] = Psi_and_A_cy(LL, uCls, tCls, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
     else:
         nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
@@ -246,7 +246,7 @@ def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
         l1y = np.linspace(-l1max, l1max, nl1y)
         l1xv, l1yv = np.meshgrid(l1x, l1y, sparse=True)  # make sparse output arrays
 
-        ## Turnover of Phi(L) seems to depend on choice of sampling here
+        ## Turnover of Psi(L) seems to depend on choice of sampling here
         ## Increase for better precision at cost of speed and memory usage
         nl2x, nl2y = (2*l2max//dl2, 2*l2max//dl2)
         l2x = np.linspace(-l2max, l2max, nl2x)
@@ -256,11 +256,11 @@ def CalcBiasExp(shape, wcs, uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
             AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCls, tCls, Clphiphi = None, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
-            Phi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
+            Psi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCls, tCls, Clphiphi = Clpp, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
 
-    return Lv, AL, Phi
+    return Lv, AL, Psi
 
 def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50, 
            uCls=None, lCls=None, Nls=None, Clpp=None, w=0., sg=0., 
@@ -285,7 +285,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
     binner = bin2D(lmap,bins)
     cents, p1d = binner.bin(p2d)
     if apply_bias:
-        c, AL, Phi = CalcBiasExp(shape, wcs, uCls, lCls+Nls, Clpp, lmin, lmax, 0, ldT, cents[cents<ldT])
+        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, lmin, lmax, 0, ldT, cents[cents<ldT])
         if plots == 'all':
             plt.figure(figsize=(8,6))
             plt.semilogy(c, AL)
@@ -295,7 +295,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
             plt.show()
             plt.close()
             plt.figure(figsize=(8,6))
-            plt.semilogy(c, Phi)
+            plt.semilogy(c, Psi)
             plt.xlabel(r'$L$')
             plt.ylabel(r'$\Psi(L)$')
             plt.tight_layout()
@@ -310,7 +310,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
     #     phiplot = False
     #     if plots == 'all':
     #         phiplot = True
-    #     Phi = CalcExp(shape, wcs, lCls, w, sg, Clpp, ldT, lmin, lmax, bins[bins<=ldT], plots=phiplot)
+    #     Psi = CalcExp(shape, wcs, lCls, w, sg, Clpp, ldT, lmin, lmax, bins[bins<=ldT], plots=phiplot)
     if plots:
         plt.figure(figsize=(8,6))
         plt.plot(cents, p1d)
@@ -323,7 +323,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
         plt.plot(cents[cents<ldT], p1d[cents<ldT] * AL)
         plt.axhline(0, c='k', ls=':')
         if Clpp is not None:
-            plt.plot(c, Phi, c='k', ls=':')
+            plt.plot(c, Psi, c='k', ls=':')
             if show_horn:
                 plt.fill_between(cents[cents<ldT], ex-2*np.sqrt(AL), 
                                  ex+2*np.sqrt(AL), alpha=0.5)
@@ -332,6 +332,6 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
         plt.tight_layout()
         plt.show()
     if apply_bias and Clpp is not None:
-        return cents, p1d, AL, Phi
+        return cents, p1d, AL, Psi
     else:
         return cents, p1d
