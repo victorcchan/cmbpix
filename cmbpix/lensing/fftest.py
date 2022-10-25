@@ -262,7 +262,7 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
 
     return Lv, AL, Psi
 
-def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50, 
+def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50, 
            uCls=None, lCls=None, Nls=None, Clpp=None, w=0., sg=0., 
            compute_bias=False):
     """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
@@ -288,7 +288,7 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50,
         The lower limit to the low-pass filter, corresponding to l2.
     l2max: int, default=3000
         The upper limit to the low-pass filter, corresponding to l2.
-    lbins: int, default=50
+    DLv: int, default=50
         The size of Lcheck bins in the output.
     uCls: 1d-array, default=None
         A fiducial unlensed CMB temperature power spectrum for filtering.
@@ -315,8 +315,8 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50,
     
     Returns
     -------
-    Lcheck: 1d-array
-        The centers of the Lcheck bins of the other outputs.
+    Lv: 1d-array
+        The centers of the Lcheck bins (set by DLv) of the other outputs.
     CLls: 1d-array
         The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
     AL: 1d-array
@@ -339,12 +339,12 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50,
     sig = Thp[0]**2 + Thp[1]**2
     fc = FourierCalc(shape, wcs)
     p2d,_,_ = fc.power2d(lam, sig) # 2D cross-spectrum between lambda & sigma maps
-    B = 10000 // lbins + 1
-    bins = np.arange(B) * lbins
+    B = l1max // DLv + 1
+    bins = np.arange(B) * DLv
     binner = bin2D(lmap,bins)
-    Lcheck, CLls = binner.bin(p2d)
+    Lv, CLls = binner.bin(p2d)
     if compute_bias:
-        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lcheck[Lcheck<l2max])
-        return Lcheck, CLls, AL, Psi
+        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
+        return Lv, CLls, AL, Psi
     else:
-        return Lcheck, CLls
+        return Lv, CLls
