@@ -262,7 +262,7 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
 
     return Lv, AL, Psi
 
-def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50, 
+def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50, 
            uCls=None, lCls=None, Nls=None, Clpp=None, w=0., sg=0., 
            compute_bias=False):
     """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
@@ -270,21 +270,24 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
     Perform the SCALE estimator for small-scale CMB lensing on map_in. 
     In general, this function pre-processes map_in according to the other 
     parameters in two different ways, and computes the cross-spectrum of 
-    these two products. Multipole limits for filtering are set by ldT, lmin, 
-    and lmax. Options are available to provide fiducial power spectra for 
-    filtering. Also numerically computes the normalization factor A_Lcheck 
-    and the expected Psi_Lcheck from theory if compute_bias is selected.
+    these two products. Multipole limits for filtering are set by l1min, 
+    l1max, l2min, and l2max. Options are available to provide fiducial 
+    power spectra for filtering. Also numerically computes the normalization 
+    factor A_Lcheck and the expected Psi_Lcheck from theory if compute_bias 
+    is selected.
 
     Parameters
     ----------
     map_in: nd_map (pixell.enmap)
         The _flat-sky_ CMB map to apply the SCALE method to.
-    ldT: int, default=3000
-        The upper limit to the low-pass filter, corresponding to l2.
-    lmin: int, default=6000
+    l1min: int, default=6000
         The lower limit to the high-pass filter, corrsponding to l1.
-    lmax: int, default=10000
+    l1max: int, default=10000
         The upper limit to the high-pass filter, corresponding to l1.
+    l2min: int, default=0
+        The lower limit to the low-pass filter, corresponding to l2.
+    l2max: int, default=3000
+        The upper limit to the low-pass filter, corresponding to l2.
     lbins: int, default=50
         The size of Lcheck bins in the output.
     uCls: 1d-array, default=None
@@ -322,17 +325,17 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
         The expected theory values for Psi_Lcheck at the same each bin center.
     """
     if uCls is None:
-        uCls = np.ones(lmax)
+        uCls = np.ones(l1max)
     if lCls is None:
-        lCls = np.ones(lmax)
+        lCls = np.ones(l1max)
     ell = np.arange(len(lCls), dtype=np.float64)
     if Nls is None:
         Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(sg*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
-    Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=0, lmax=ldT, grad=True)
+    Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=l2min, lmax=l2max, grad=True)
     lam = Tlp[0]**2 + Tlp[1]**2
-    Thp = InvVarFilter(map_in, ell, lCls, Nls, lmin, lmax, grad=True)
+    Thp = InvVarFilter(map_in, ell, lCls, Nls, lmin=l1min, lmax=l1max, grad=True)
     sig = Thp[0]**2 + Thp[1]**2
     fc = FourierCalc(shape, wcs)
     p2d,_,_ = fc.power2d(lam, sig) # 2D cross-spectrum between lambda & sigma maps
@@ -341,7 +344,7 @@ def FFTest(map_in, ldT=3000, lmin=6000, lmax=10000, lbins=50,
     binner = bin2D(lmap,bins)
     Lcheck, CLls = binner.bin(p2d)
     if compute_bias:
-        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, lmin, lmax, 0, ldT, Lcheck[Lcheck<ldT])
+        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lcheck[Lcheck<l2max])
     if compute_bias and Clpp is not None:
         return Lcheck, CLls, AL, Psi
     else:
