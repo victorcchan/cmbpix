@@ -345,7 +345,6 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, lbins=50,
     Lcheck, CLls = binner.bin(p2d)
     if compute_bias:
         c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lcheck[Lcheck<l2max])
-    if compute_bias and Clpp is not None:
         return Lcheck, CLls, AL, Psi
     else:
         return Lcheck, CLls
