@@ -293,7 +293,7 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
             PsiLv[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCl, tCl, Clphiphi = Clpp, 
-                l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
+                l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*ALv[iL]
 
     return ALv, PsiLv
 
