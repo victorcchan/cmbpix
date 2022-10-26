@@ -317,11 +317,11 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     -------
     Lv: 1d-array
         The centers of the Lcheck bins (set by DLv) of the other outputs.
-    CLls: 1d-array
+    CLvls: 1d-array
         The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
-    AL: 1d-array
+    ALv: 1d-array
         The normalization for CLls such that Psi_Lcheck = AL*CLls.
-    Psi: 1d-array
+    PsiLv: 1d-array
         The expected theory values for Psi_Lcheck at the same each bin center.
     """
     if uCls is None:
@@ -342,9 +342,9 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     B = l1max // DLv + 1
     bins = np.arange(B) * DLv
     binner = bin2D(lmap,bins)
-    Lv, CLls = binner.bin(p2d)
+    Lv, CLvls = binner.bin(p2d)
     if compute_bias:
-        c, AL, Psi = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
-        return Lv, CLls, AL, Psi
+        c, ALv, PsiLv = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
+        return Lv, CLvls, ALv, PsiLv
     else:
-        return Lv, CLls
+        return Lv, CLvls
