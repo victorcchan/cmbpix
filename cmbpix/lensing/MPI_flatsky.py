@@ -106,7 +106,7 @@ def _PearsonWidth(vol, xs, N, sig2, *p):
     xmode = xs[imode]
     a0 = (xmode - xs.min())/2
     def findb(a):
-        Pa = Pearson3(a, N, sig2)
+        Pa = _Pearson3(a, N, sig2)
         bguess = xs[imode:][np.argmin(np.abs(Px[imode:] - Pa))]
         minb = lambda b : _Pearson3(b, N, sig2) - Pa
         b = fsolve(minb, bguess)[0]
