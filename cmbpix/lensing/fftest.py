@@ -271,7 +271,6 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
     PsiLv = np.zeros(np.shape(Lv)[0])
 
     if useC:
-        print("Using Cython implementation", flush=True)
         for iL, LL in enumerate(Lv):
             PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
