@@ -221,23 +221,59 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
 
 def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, 
     dl1=100, dl2=100, useC=True):
+    """Return the normalization AL and expected Psi_L for the given spectra.
 
-    # nL = l2max // lbins
-    # Lmax = l2max
-    # Lmin = l2min
-    # Lv = np.linspace(Lmin, Lmax, nL)
+    Return the numerically integrated normalization factors AL as well as 
+    expected Psi_L outputs for SCALE. Numerical accuracy can be tuned with 
+    the dl1 and dl2 parameters. A Cython implementation is enabled by default 
+    with the useC parameter; otherwise, a pure Python implementation is used.
+
+    Parameters
+    ----------
+    uCl: 1d-array
+        A fiducial unlensed CMB temperature power spectrum.
+    tCl: 1d-array
+        A fiducial total, observed CMB temperature power spectrum.
+    Clpp: 1d-array
+        A fiducial lensing potential (phiphi) power spectrum.
+    l1min: int
+        The lower limit to the small-scale integral, corrsponding to l1.
+    l1max: int
+        The upper limit to the small-scale integral, corresponding to l1.
+    l2min: int
+        The lower limit to the large-scale integral, corresponding to l2.
+    l2max: int
+        The upper limit to the large-scale integral, corresponding to l2.
+    Lv: 1d-array
+        The Lcheck values (centered in bins) at which to evaluate Al, Psi_L.
+    dl1: int
+        The integration step size for the l1 integral. 
+        (Bigger effect on accuracy)
+    dl2: int
+        The integration step size for the l2 integral.
+    useC: bool, default=True
+        If True, use the Cython implementation (~4*Ncores times faster). 
+        Else, use the pure Python implementation.
+    
+    Returns
+    -------
+    ALv: 1d-array
+        The normalization factors evaluated at each Lv.
+    PsiLv: 1d-array
+        The expected SCALE Psi_Lcheck evaluated at each Lv.
+    """
 
 
     ## Do each L individually to save on memory usage
     ## Loop is a bit slower than vectorized calculation, but memory savings is factor of nL
 
-    AL = np.zeros(np.shape(Lv)[0])
-    Psi = np.zeros(np.shape(Lv)[0])
+    ALv = np.zeros(np.shape(Lv)[0])
+    PsiLv = np.zeros(np.shape(Lv)[0])
 
     if useC:
         print("Using Cython implementation", flush=True)
         for iL, LL in enumerate(Lv):
-            Psi[iL], AL[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
     else:
         nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
@@ -252,14 +288,14 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
         l2y = np.linspace(-l2max, l2max, nl2y)
         l2xv, l2yv = np.meshgrid(l2x, l2y, sparse=True)  # make sparse output arrays
         for iL, LL in enumerate(Lv):
-            AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
+            ALv[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCl, tCl, Clphiphi = None, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
-            Psi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
+            PsiLv[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCl, tCl, Clphiphi = Clpp, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
 
-    return Lv, AL, Psi
+    return ALv, PsiLv
 
 def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50, 
            uCl=None, lCl=None, Nl=None, Clpp=None, w=0., b=0., 
@@ -343,7 +379,7 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     binner = bin2D(lmap,bins)
     Lv, CLvls = binner.bin(p2d)
     if compute_bias:
-        c, ALv, PsiLv = CalcBiasExp(uCl, lCl+Nl, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
+        ALv, PsiLv = CalcBiasExp(uCl, lCl+Nl, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
         return Lv, CLvls, ALv, PsiLv
     else:
         return Lv, CLvls
