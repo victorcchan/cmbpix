@@ -263,7 +263,7 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
     return Lv, AL, Psi
 
 def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50, 
-           uCls=None, lCls=None, Nls=None, Clpp=None, w=0., b=0., 
+           uCl=None, lCl=None, Nl=None, Clpp=None, w=0., b=0., 
            compute_bias=False):
     """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
 
@@ -290,13 +290,13 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
         The upper limit to the low-pass filter, corresponding to l2.
     DLv: int, default=50
         The size of Lcheck bins in the output.
-    uCls: 1d-array, default=None
+    uCl: 1d-array, default=None
         A fiducial unlensed CMB temperature power spectrum for filtering.
         If None, no filter is applied.
-    lCls: 1d-array, default=None
+    lCl: 1d-array, default=None
         A fiducial lensed CMB temperature power specturm for filtering.
         If None, no filter is applied.
-    Nls: 1d-array, default=None
+    Nl: 1d-array, default=None
         A fiducial CMB temperature noise spectrum for filtering.
         If None, a set of Nls are computed with w, sg.
     Clpp: 1d-array, default=None
@@ -324,18 +324,18 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     PsiLv: 1d-array
         The expected theory values for Psi_Lcheck at the same each bin center.
     """
-    if uCls is None:
-        uCls = np.ones(l1max)
-    if lCls is None:
-        lCls = np.ones(l1max)
-    ell = np.arange(len(lCls), dtype=np.float64)
-    if Nls is None:
-        Nls = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
+    if uCl is None:
+        uCl = np.ones(l1max)
+    if lCl is None:
+        lCl = np.ones(l1max)
+    ell = np.arange(len(lCl), dtype=np.float64)
+    if Nl is None:
+        Nl = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
-    Tlp = WienerFilter(map_in, ell, uCls, lCls, Nls, lmin=l2min, lmax=l2max, grad=True)
+    Tlp = WienerFilter(map_in, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
     lam = Tlp[0]**2 + Tlp[1]**2
-    Thp = InvVarFilter(map_in, ell, lCls, Nls, lmin=l1min, lmax=l1max, grad=True)
+    Thp = InvVarFilter(map_in, ell, lCl, Nl, lmin=l1min, lmax=l1max, grad=True)
     sig = Thp[0]**2 + Thp[1]**2
     fc = FourierCalc(shape, wcs)
     p2d,_,_ = fc.power2d(lam, sig) # 2D cross-spectrum between lambda & sigma maps
@@ -344,7 +344,7 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     binner = bin2D(lmap,bins)
     Lv, CLvls = binner.bin(p2d)
     if compute_bias:
-        c, ALv, PsiLv = CalcBiasExp(uCls, lCls+Nls, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
+        c, ALv, PsiLv = CalcBiasExp(uCl, lCl+Nl, Clpp, l1min, l1max, l2min, l2max, Lv[Lv<l2max])
         return Lv, CLvls, ALv, PsiLv
     else:
         return Lv, CLvls
