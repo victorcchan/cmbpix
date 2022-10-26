@@ -219,14 +219,13 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin, 
+def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, 
     dl1=100, dl2=100, useC=True):
 
     # nL = l2max // lbins
     # Lmax = l2max
     # Lmin = l2min
     # Lv = np.linspace(Lmin, Lmax, nL)
-    Lv = lbin
 
 
     ## Do each L individually to save on memory usage
@@ -238,7 +237,7 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
     if useC:
         print("Using Cython implementation", flush=True)
         for iL, LL in enumerate(Lv):
-            Psi[iL], AL[iL] = Psi_and_A_cy(LL, uCls, tCls, Clpp, l1min, l1max, 
+            Psi[iL], AL[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
     else:
         nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
@@ -254,10 +253,10 @@ def CalcBiasExp(uCls, tCls, Clpp, l1min, l1max, l2min, l2max, lbin,
         l2xv, l2yv = np.meshgrid(l2x, l2y, sparse=True)  # make sparse output arrays
         for iL, LL in enumerate(Lv):
             AL[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-                uCls, tCls, Clphiphi = None, 
+                uCl, tCl, Clphiphi = None, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
             Psi[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-                uCls, tCls, Clphiphi = Clpp, 
+                uCl, tCl, Clphiphi = Clpp, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*AL[iL]
 
     return Lv, AL, Psi
