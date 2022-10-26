@@ -1,3 +1,4 @@
+from tkinter import W
 import numpy as np
 import matplotlib.pyplot as plt
 from pixell import enmap, utils as putils
@@ -296,8 +297,8 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
 
     return ALv, PsiLv
 
-def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50, 
-           uCl=None, lCl=None, Nl=None, Clpp=None, w=0., b=0., 
+def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
+           DLv=50, uCl=None, lCl=None, Nl=None, Clpp=None, w=0., b=0., 
            compute_bias=False):
     """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
 
@@ -314,6 +315,9 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
     ----------
     map_in: nd_map (pixell.enmap)
         The _flat-sky_ CMB map to apply the SCALE method to.
+    map_delens: nd_map (pixell.enmap), default=None
+        A delensed or unlensed version of map_in. If given, this map is 
+        used to compute the lambda (corresponding to large-scales) map.
     l1min: int, default=6000
         The lower limit to the high-pass filter, corrsponding to l1.
     l1max: int, default=10000
@@ -367,7 +371,10 @@ def SCALE(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, DLv=50,
         Nl = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
-    Tlp = WienerFilter(map_in, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
+    if map_delens is not None:
+        Tlp = WienerFilter(map_delens, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
+    else:
+        Tlp = WienerFilter(map_in, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
     lam = Tlp[0]**2 + Tlp[1]**2
     Thp = InvVarFilter(map_in, ell, lCl, Nl, lmin=l1min, lmax=l1max, grad=True)
     sig = Thp[0]**2 + Thp[1]**2
