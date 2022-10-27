@@ -9,7 +9,7 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 extensions = [setuptools.Extension("cmbpix.lensing.SCALE_c", 
 	["cmbpix/lensing/SCALE_c.pyx"], 
 	extra_compile_args=['-fopenmp'], 
-	extra_link_args=['-fopenmp', '--force']), 
+	extra_link_args=['-fopenmp']), 
 ]
 
 setuptools.setup(
