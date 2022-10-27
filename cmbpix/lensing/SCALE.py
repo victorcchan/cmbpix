@@ -275,7 +275,7 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
         for iL, LL in enumerate(Lv):
             PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
-        Alv *= (2*np.pi)**4
+        ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4
     else:
         nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
