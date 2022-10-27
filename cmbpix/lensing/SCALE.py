@@ -275,6 +275,8 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
         for iL, LL in enumerate(Lv):
             PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
+        Alv *= (2*np.pi)**4
+        PsiLv /= (2*np.pi)**4
     else:
         nl1x, nl1y = (2*l1max//dl1, 2*l1max//dl1)
         l1x = np.linspace(-l1max, l1max, nl1x)
@@ -294,7 +296,6 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
             PsiLv[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
                 uCl, tCl, Clphiphi = Clpp, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*ALv[iL]
-
     return ALv, PsiLv
 
 def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
@@ -358,9 +359,11 @@ def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     CLvls: 1d-array
         The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
     ALv: 1d-array
-        The normalization for CLls such that Psi_Lcheck = AL*CLls.
+        The normalization for CLls such that Psi_Lcheck = AL*CLls. 
+        Only returned if compute_bias=True.
     PsiLv: 1d-array
         The expected theory values for Psi_Lcheck at the same each bin center.
+        Only returned if compute_bias=True.
     """
     if uCl is None:
         uCl = np.ones(l1max)
