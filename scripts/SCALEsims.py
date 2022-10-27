@@ -235,8 +235,8 @@ outs = {'L_qe': cents_phi,
 
 ## If doing multiple binnings, add separately
 for lbin in DLv:
-    outs['CLv_unlensed_DLv{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
-    outs['CLv_lensed_DLv{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
+    outs['CLv_unlensed_DLv{}'.format(lbin)] = np.empty([Nsims, l1max//lbin], dtype=np.float64)
+    outs['CLv_lensed_DLv{}'.format(lbin)] = np.empty([Nsims, l1max//lbin], dtype=np.float64)
 ## Loop over sims
 for i in range(Nsims):
     if i % 10 == 0:
