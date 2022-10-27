@@ -1,10 +1,48 @@
-import mpi4py.rc # These first 3 lines allow mpi4py to work on Scinet
+"""SCALE simulations
+
+This script simulates CMB lensing maps according to a relatively vanilla 
+cosmological model, and recovers the underlying lensing information using 
+the SCALE methodology. The SCALE output(s) along with a copy of the 
+normalization factors ALv, and expected output Psi_Lv are saved. Many options 
+are available to allow for flexibility in the simulations, SCALE configuration, 
+and even applying/saving analogous analysis using the Hu, DeDeo and Vale 
+quadratic estimator.
+
+The general flow of the script is as follows:
+    * Import relevant packages
+        * mpi4py is required for running simulations on multiple cores
+        * SCALE submodule in cmbpix.lensing contains the relevant functions
+        * numpy is used throughout the script
+        * camb is used to generate CMB power spectra for simulated maps
+        * pixell is used to generate and manipulate flatsky CMB maps
+        * symlens is used to apply quadratic estimators if desired
+        * orphics is used to manipulate QE outputs from symlens
+        * scipy.interpolate's interp1d method is used to prepare
+            inputs for symlens
+        * pickle is used to save outputs
+        * argparse is used to interpret options from the command prompt
+    * Set up MPI workflow
+    * Read in options from argparse
+    * Generate CMB power spectra/lensing spectra with CAMB
+    * If applicable, set up quadratic estimator
+        * Compute realization-independent N_L
+    * Loop over simulations/realizations in each process/core
+        * Generate unlensed CMB T map, lens potential (phi) map, noise map
+        * Apply lensing to T map with phi map
+        * On first loop, compute normalization A_Lv, and expected Psi_Lv
+        * Run SCALE on both unlensed and lensed realizations, save C_Lv^ls
+        * If applicable, run the quadratic estimator on lensed realization
+    * Gather SCALE/QE outputs from all processes to 0th process
+    * Save outputs
+"""
+
+import mpi4py.rc ## These first 3 lines allow mpi4py to work on Scinet
 mpi4py.rc.threads = False
 mpi4py.rc.finalize = True
 from mpi4py import MPI
 import numpy as np
 from pixell import enmap, utils, lensing
-from cmbpix.lensing import fftest as fe
+from cmbpix.lensing import SCALE
 from symlens import qe, interp
 from orphics.maps import mask_kspace, FourierCalc, binned_power
 from orphics.stats import bin2D
@@ -14,35 +52,40 @@ import pickle
 import argparse
 
 import warnings
-warnings.filterwarnings(action='ignore')# Change to once for first time
+warnings.filterwarnings(action='ignore') ## Change to once for first time
 
-# MPI stuff
+## MPI stuff
 comm = MPI.COMM_WORLD
 rank = comm.Get_rank()
 size = comm.Get_size()
 
-# Test params
+## Test params
 parser = argparse.ArgumentParser(
     description="Simulate CMB realizations and quantify lensing")
-parser.add_argument("-lb", 
+parser.add_argument("--DLv", 
     required=True, 
     nargs='+',
-    help="Size of L binning for CLGK estimator")
-parser.add_argument("--lmin", 
+    help="Size of Lv binning for SCALE estimator")
+parser.add_argument("--l1min", 
     required=False, 
     default=6000, 
     type=int, 
-    help="Minimum l for high-pass filter")
-parser.add_argument("--lmax", 
+    help="Lower l1 limit for high-pass filter")
+parser.add_argument("--l1max", 
     required=False, 
     default=8000, 
     type=int, 
-    help="Maximum l for high-pass filter")
-parser.add_argument("--ldT", 
+    help="Upper l1 limit for high-pass filter")
+parser.add_argument("--l2min", 
+    required=False, 
+    default=0, 
+    type=int, 
+    help="Lower l2 limit for low-pass filter")
+parser.add_argument("--l2max", 
     required=False, 
     default=3000, 
     type=int, 
-    help="Maximum l for low-pass filter")
+    help="Upper l2 limit for low-pass filter")
 parser.add_argument("--w", 
     required=False, 
     default=1.0, 
@@ -52,12 +95,12 @@ parser.add_argument("--b",
     required=False, 
     default=1.0, 
     type=float, 
-    help="Beam size in arcmin")
+    help="Beam size (FWHM) in arcmin")
 parser.add_argument("--res", 
     required=False, 
     default=0.5, 
     type=float, 
-    help="Resolution of simulated maps")
+    help="Resolution of simulated maps in arcmin")
 parser.add_argument("--width", 
     required=False, 
     default=10, 
@@ -71,12 +114,12 @@ parser.add_argument("--Nsims",
 parser.add_argument("--qe", 
     required=False, 
     action="store_true", 
-    help="If true, run QE and save with outputs")
+    help="If used, run QE and save with outputs")
 parser.add_argument("--lpa", 
     required=False, 
     default=8, 
     type=int, 
-    help="Lens Potential Accuracy parameter for CAMB")
+    help="Lens Potential Accuracy parameter for CAMB (>=8 recommended)")
 parser.add_argument("--phimin", 
     required=False, 
     default=0, 
@@ -85,50 +128,48 @@ parser.add_argument("--phimax",
     required=False, 
     default=-1, 
     help="Maximum for window filter for lens potential")
+parser.add_argument("--delens", 
+    required=False, 
+    action="store_true", 
+    help="If used, use unlensed map to generate lambda maps.")
 args = parser.parse_args()
-lb = np.array(args.lb, dtype=int) # l bin size
-lmin = args.lmin
-lmax = args.lmax
-ldT = args.ldT
-w = args.w # In uK-arcmin
-b = args.b # In arcmin
+DLv = np.array(args.DLv, dtype=int) ## Lv bin size
+l1min = args.l1min
+l1max = args.l1max
+l2min = args.l2min
+l2max = args.l2max
+w = args.w ## In uK-arcmin
+b = args.b ## In arcmin
+width = args.width
+reso = args.res
 Nsims = args.Nsims
 pmin = int(args.phimin)
 pmax = int(args.phimax)
 lpa=args.lpa
-# lb = 500 # l bin size
-# lmin = 6000
-# lmax = 8000
-# ldT = 3000
-# w = 1.0 # In uK-arcmin
-# b = 1.0 # In arcmin
 
 if rank == 0:
     wn = str(w).replace('.', 'p')
     bn = str(b).replace('.', 'p')
-    loc = '/scratch/p/pen/victorc/lensing/CLGK'
-    fn = '/FFTout_{}ldT_{}lb_{}-{}_{}uKarcmin_{}beam_lpa{}_{}-{}phi_{}sqdeg.pkl'.format(ldT, 
-                                                                   lb, lmin, lmax, wn, bn, lpa, pmin, pmax, args.width*10)
+    loc = '/scratch/p/pen/victorc/lensing/CLGK/' ## Change this for file location
+    ## Construct unique filename based on argparse options
+    l1str = '_{}-{}l1'.format(l1min, l1max)
+    l2str = '_{}-{}l2'.format(l2min, l2max)
+    DLvstr = '_{}DLv'.format(DLv)
+    nstr = '_{}uKarcmin_{}arcmin'.format(wn, bn)
+    lensstr = '_{}lpa_{}-{}phi'.format(lpa, pmin, pmax)
+    mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), reso, 
+                                                    int(Nsims*size))
+    end = '.pkl'
+    if args.delens:
+        end = '_delensed' + end
+    if args.qe:
+        end = '_wQE' + end
+    fn = 'SCALE'+l1str+l2str+DLvstr+nstr+lensstr+mapstr+end
 
-# # Input CMB info
-# X = np.loadtxt("sims/cosmo2017_10K_acc3_scalCls.dat")
-# Z = np.loadtxt("lensedPS.txt")
-
-# TCMB = 2.726e6
-# ell = X[:,0]
-# dltt = X[:,1]
-# clkk = X[:,4]/(TCMB**2)/4.
-# clpp = 4 * clkk / (ell**2 * (ell+1)**2)
-# ellfac = ell * (ell+1) / 2 / np.pi
-# cltt = dltt / ellfac
-# w2 = (w * np.pi / 10800)**2
-# beam = 1.0 * np.pi / 10800 / (2 * np.sqrt(2*np.log(2)))
-# Wl = np.exp(-ell*(ell+1)*beam**2)
-# Nl = w2 / Wl
-
-#Set up a new set of parameters for CAMB
+## Set up a new set of parameters for CAMB
 pars = camb.CAMBparams()
-#This function sets up CosmoMC-like settings, with one massive neutrino and helium set using BBN consistency
+## This function sets up CosmoMC-like settings, 
+## with one massive neutrino and helium set using BBN consistency
 pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122, mnu=0.06, omk=0, tau=0.06)
 pars.InitPower.set_params(As=2e-9, ns=0.965, r=0)
 pars.set_for_lmax(20000, lens_potential_accuracy=lpa);
@@ -146,34 +187,25 @@ cphiphi = (powers['lens_potential'][:,0]/ell_fac_phi)
 cphiphi[:pmin] = 0.
 cphiphi[pmax:] = 0.
 
-# Noise spectrum
-# w2 = (w * np.pi / 10800)**2
-# beam = 1.0 * np.pi / 10800 / (2 * np.sqrt(2*np.log(2)))
-# Wl = np.exp(-ell*(ell+1)*beam**2)
-# ntt = w2 / Wl
-Delta_T = args.w  # In muK-arcmin
-theta_fwhm = args.b  # in arcmin
-ntt = (Delta_T*np.pi/180./60.)**2. * np.exp((theta_fwhm*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2.*ls**2.)
+## Noise spectrum
+ntt = (w*np.pi/180./60.)**2. * np.exp((b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2.*ls**2.)
 
 ctt_total = ctt_lensed + ntt
-# Replace potential nan here
+## Replace potential nan here
 ctt_unlensed[0] = 0
 ctt_lensed[0] = 0
 cphiphi[0] = 0
 
-# Simulation size/resolution
-width = args.width
-reso = args.res
+## Simulation size/resolution
 box = np.array([[-5,width/2],[5,-width/2]]) * utils.degree
 shape, wcs = enmap.geometry(pos=box, res=reso*utils.arcmin, proj='car')
-# shape, wcs = maps.rect_geometry(width_deg=10., px_res_arcmin=0.5)
 modlmap = enmap.modlmap(shape, wcs)
 
-# Binner for data power spectrum
+## Binner for data power spectrum
 Dbins = np.arange(20,20000,20)
 Dbinner = bin2D(modlmap,Dbins)
 
-# Initialize objects for QE
+## Initialize objects for QE
 XY='TT'
 UV='TT'
 ellmin = 500 ; ellmax = 10000
@@ -191,8 +223,8 @@ Nphi = bin_edges_phi.size - 1
 cents_phi, pp_theory_bin = binner_phi.bin(interp(ls,cphiphi)(modlmap))
 cents_phi, kk_theory_bin = binner_phi.bin(interp(ls, 2*np.pi*powers['lens_potential'][:,0]/4.)(modlmap))
 
-# Output data goes here
-outs = {'cents_qe': cents_phi, 
+## Output data goes here
+outs = {'L_qe': cents_phi, 
         'reconst': np.empty([Nsims, Nphi], dtype=np.float64), 
         'phi_real': np.empty([Nsims, Nphi], dtype=np.float64), 
         'k_real': np.empty([Nsims, Nphi], dtype=np.float64), 
@@ -201,36 +233,33 @@ outs = {'cents_qe': cents_phi,
         'phi_theory': pp_theory_bin, 
         'k_theory': kk_theory_bin}
 
-# If doing multiple binnings, add separately
-for lbin in lb:
-    outs['unlensed{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
-    outs['lensed{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
-# Sims
+## If doing multiple binnings, add separately
+for lbin in DLv:
+    outs['CLv_unlensed_DLv{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
+    outs['CLv_lensed_DLv{}'.format(lbin)] = np.empty([Nsims, 10000//lbin], dtype=np.float64)
+## Loop over sims
 for i in range(Nsims):
     if i % 10 == 0:
         print("{}% complete on rank {}".format(i, rank), flush=True)
-    # Generate maps
+    ## Generate maps
     Tmap = enmap.rand_map((1,) + shape, wcs, 
         interp(ls, ctt_unlensed)(modlmap)[np.newaxis, np.newaxis, :, :] )[0]
     phimap = enmap.rand_map((1,) + shape, wcs, 
         interp(ls, cphiphi)(modlmap)[np.newaxis, np.newaxis, :, :] )[0]
     nmap = enmap.rand_map((1,) + shape, wcs, 
         interp(ls, ntt)(modlmap)[np.newaxis, np.newaxis, :, :] )[0]
-    # Tmap = enmap.rand_map(shape, wcs, ctt_unlensed)
-    # phimap = enmap.rand_map(shape, wcs, cphiphi)
-    # nmap = enmap.rand_map(shape, wcs, ntt)
     lTmap = lensing.lens_map_flat(Tmap, phimap)
-    if args.qe:
-        # Compute power spectrum for this realization
+    if args.qe: ## Apply QE to lensed+noise map if option selected
+        ## Compute power spectrum for this realization
         dcents, C_l_tot = Dbinner.bin(np.abs(enmap.fft(lTmap+nmap, 
             normalize='phys'))**2)
-        # Set up dictionary for QE
+        ## Set up dictionary for QE
         feed_dict['X'] = enmap.fft(lTmap+nmap, normalize='phys')
         feed_dict['Y'] = feed_dict['X']
         feed_dict['dC_T_T'] = interp1d(dcents, C_l_tot, 
             bounds_error=False, fill_value=0)(modlmap)
 
-        # Run QE on the lensed realization, then run CLGK estimator
+        ## Run QE on the lensed realization, then run CLGK estimator
         my_reconst = qe.reconstruct(shape, wcs, feed_dict, 'hdv', XY, 
             xmask= xmask, ymask = ymask)
         my_A_l = qe.A_l(shape, wcs, feed_dict, 'hdv', XY, xmask, ymask)
@@ -240,51 +269,62 @@ for i in range(Nsims):
         cents_phi, RDN0_l_bin = binner_phi.bin(rdn0_2d)
         Krecon = enmap.ifft(my_reconst, normalize='phys')
         Kcor = FourierCalc(shape, wcs)
-        dy_p, dx_p = enmap.grad(phimap)
-        dyy_p, dyx_p = enmap.grad(dy_p)
+        dy_p, dx_p = enmap.grad(phimap) ## Compute spectra of actual realization
+        dyy_p, dyx_p = enmap.grad(dy_p) ## for comparison
         dxy_p, dxx_p = enmap.grad(dx_p)
         k_map = -0.5 * (dyy_p + dxx_p)
         cents_phi, kk_real_bin = binned_power(k_map, bin_edges_phi)
         cents_phi, pp_real_bin = binned_power(phimap, bin_edges_phi)
-        cross2d = Kcor.power2d(Krecon, k_map)
+        cross2d = Kcor.power2d(Krecon, k_map) ## Cross-spectrum for comparing
         cents_phi, cross_bin = binner_phi.bin(cross2d[0])
 
-    # Compute normalization and prediction on first pass only
-    for lbin in lb:
-        if i == 0:
-            ucents, up1d, AL, Phi = fe.FFTest(Tmap+nmap, 
-                ldT=ldT, lmin=lmin, lmax=lmax, lbins=lbin, 
-                uCls=ctt_unlensed, lCls=ctt_lensed, Nls=ntt, Clpp=cphiphi, 
-                w=w, sg=b, apply_bias=True, plots=False)
-            if args.qe:
+    ## Compute normalization and prediction on first pass only
+    for lbin in DLv:
+        if i == 0: ## No need to delens unlensed maps
+            ## Unlensed cphiphi should technically be 0, 
+            ## but this doesn't affect anything we keep
+            ucents, up1d, AL, Psi = SCALE.SCALE(Tmap+nmap, map_delens=None, 
+                l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                DLv=lbin, uCl=ctt_unlensed, lCl=ctt_unlensed, Nl=ntt, 
+                Clpp=cphiphi, w=w, b=b, compute_bias=True)
+            if args.qe: ## Optimal noise is independent of realization; do once
                 N_l_phi = qe.N_l_optimal(shape,wcs,feed_dict,'hdv',XY,
                     xmask=xmask,ymask=ymask,field_names=None,kmask=kmask)
                 cents_phi, N0_l_bin = binner_phi.bin(N_l_phi)
                 outs['N0'] = N0_l_bin
-            outs['cents{}'.format(lbin)] = ucents
-            outs['AL_unlensed{}'.format(lbin)] = AL
-            # outs['BL'] = BL
-
-            lcents, lp1d = fe.FFTest(lTmap+nmap, 
-                ldT=ldT, lmin=lmin, lmax=lmax, lbins=lbin, 
-                uCls=ctt_unlensed, lCls=ctt_lensed, Nls=ntt, Clpp=cphiphi, 
-                w=w, sg=b, apply_bias=False, plots=False)
-            outs['AL_lensed{}'.format(lbin)] = AL
-            outs['Phi{}'.format(lbin)] = Phi
+            outs['Lv_DLv{}'.format(lbin)] = ucents
+            outs['ALv_unlensed_DLv{}'.format(lbin)] = AL
+            if args.delens: ## Delensing option --> Pass in unlensed map as well
+                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
+                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
+            else:
+                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
+            outs['ALv_lensed_DLv{}'.format(lbin)] = AL
+            outs['PsiLv_DLv{}'.format(lbin)] = Psi
             print("Rank {} done initial step for Lbin {}".format(rank, lbin), flush=True)
         else:
-            ucents, up1d = fe.FFTest(Tmap+nmap, 
-                ldT=ldT, lmin=lmin, lmax=lmax, lbins=lbin, 
-                uCls=ctt_unlensed, lCls=ctt_lensed, Nls=ntt, Clpp=cphiphi, 
-                w=w, sg=b, apply_bias=False, plots=False)
+            ucents, up1d = SCALE.SCALE(Tmap+nmap, map_delens=None, 
+                l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                DLv=lbin, uCl=ctt_unlensed, lCl=ctt_unlensed, Nl=ntt, 
+                Clpp=cphiphi, w=w, b=b, compute_bias=False)
+            if args.delens:
+                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
+                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                    Clpp=cphiphi, w=w, b=b, compute_bias=False)
+            else:
+                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                    Clpp=cphiphi, w=w, b=b, compute_bias=False)
 
-            lcents, lp1d = fe.FFTest(lTmap+nmap, 
-                ldT=ldT, lmin=lmin, lmax=lmax, lbins=lbin, 
-                uCls=ctt_unlensed, lCls=ctt_lensed, Nls=ntt, Clpp=cphiphi, 
-                w=w, sg=b, apply_bias=False, plots=False)
-
-        outs['unlensed{}'.format(lbin)][i,:] = up1d
-        outs['lensed{}'.format(lbin)][i,:] = lp1d
+        outs['CLv_unlensed_DLv{}'.format(lbin)][i,:] = up1d
+        outs['CLv_lensed_DLv{}'.format(lbin)][i,:] = lp1d
     if args.qe:
         outs['reconst'][i,:] = reconst_bin
         outs['phi_real'][i,:] = pp_real_bin
@@ -297,11 +337,7 @@ for i in range(Nsims):
 if rank == 0:
     print("Rank 0 all done", flush=True)
 comm.Barrier()
-# specsize = outs['unlensed'][0].size
-#print("Saving individual files", flush=True)
-#with open(loc+fn, 'wb') as p:
-#    pickle.dump(outs, p)
-comm.Barrier()
+## Gather results to one process, and save
 if rank == 0:
     print("Done saving indivudual files, setting up MPI Gather", flush=True)
     if args.qe:
@@ -328,7 +364,7 @@ if args.qe:
     comm.Gather(outs['k_real'], krealrec, root=0)
     comm.Gather(outs['k_cross'], kcrossrec, root=0)
 comm.Barrier()
-for lbin in lb:
+for lbin in DLv:
     if rank == 0:
         urec = np.empty([size, Nsims, 10000//lbin], dtype=np.float64)
         lrec = np.empty([size, Nsims, 10000//lbin], dtype=np.float64)
@@ -336,12 +372,12 @@ for lbin in lb:
         urec = None
         lrec = None
     comm.Barrier()
-    comm.Gather(outs['unlensed{}'.format(lbin)], urec, root=0)
-    comm.Gather(outs['lensed{}'.format(lbin)], lrec, root=0)
+    comm.Gather(outs['CLv_unlensed_DLv{}'.format(lbin)], urec, root=0)
+    comm.Gather(outs['CLv_lensed_DLv{}'.format(lbin)], lrec, root=0)
     comm.Barrier()
     if rank == 0:
-        outs['unlensed{}'.format(lbin)] = np.concatenate(urec, axis=0)
-        outs['lensed{}'.format(lbin)] = np.concatenate(lrec, axis=0)
+        outs['CLv_unlensed_DLv{}'.format(lbin)] = np.concatenate(urec, axis=0)
+        outs['CLv_lensed_DLv{}'.format(lbin)] = np.concatenate(lrec, axis=0)
 
 
 if rank == 0:
