@@ -36,6 +36,7 @@ The general flow of the script is as follows:
     * Save outputs
 """
 
+from re import A
 import mpi4py.rc ## These first 3 lines allow mpi4py to work on Scinet
 mpi4py.rc.threads = False
 mpi4py.rc.finalize = True
@@ -304,10 +305,16 @@ for i in range(Nsims):
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=True)
             else:
-                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
-                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
-                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
-                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
+                if args.delens:
+                    lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
+                        l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                        DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                        Clpp=cphiphi, w=w, b=b, compute_bias=True)
+                else:
+                    lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                        l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                        DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                        Clpp=cphiphi, w=w, b=b, compute_bias=True)
             outs['ALv_lensed_DLv{}'.format(lbin)] = AL
             outs['PsiLv_DLv{}'.format(lbin)] = Psi
             print("Rank {} done initial step for Lbin {}".format(rank, lbin), flush=True)
@@ -370,8 +377,8 @@ if args.qe:
 comm.Barrier()
 for lbin in DLv:
     if rank == 0:
-        urec = np.empty([size, Nsims, 10000//lbin], dtype=np.float64)
-        lrec = np.empty([size, Nsims, 10000//lbin], dtype=np.float64)
+        urec = np.empty([size, Nsims, l1max//lbin], dtype=np.float64)
+        lrec = np.empty([size, Nsims, l1max//lbin], dtype=np.float64)
     else:
         urec = None
         lrec = None
