@@ -36,7 +36,6 @@ The general flow of the script is as follows:
     * Save outputs
 """
 
-from re import A
 import mpi4py.rc ## These first 3 lines allow mpi4py to work on Scinet
 mpi4py.rc.threads = False
 mpi4py.rc.finalize = True
