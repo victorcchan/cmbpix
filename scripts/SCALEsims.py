@@ -147,9 +147,13 @@ pmin = int(args.phimin)
 pmax = int(args.phimax)
 lpa=args.lpa
 
-if rank == 0:
+if rank == 0: # Format some strings to create unique filename
     wn = str(w).replace('.', 'p')
     bn = str(b).replace('.', 'p')
+    rn = str(reso).replace('.', 'p')
+    DLn = str(DLv)[1:-1].replace('  ', '-').replace(' ', '-')
+    if DLn[0] == '-':
+        DLn = DLn[1:]
     loc = '/scratch/p/pen/victorc/lensing/CLGK/' ## Change this for file location
     ## Construct unique filename based on argparse options
     l1str = '_{}-{}l1'.format(l1min, l1max)
@@ -157,7 +161,7 @@ if rank == 0:
     DLvstr = '_{}DLv'.format(DLv)
     nstr = '_{}uKarcmin_{}arcmin'.format(wn, bn)
     lensstr = '_{}lpa_{}-{}phi'.format(lpa, pmin, pmax)
-    mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), reso, 
+    mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), rn, 
                                                     int(Nsims*size))
     end = '.pkl'
     if args.delens:
