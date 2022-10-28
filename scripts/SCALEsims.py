@@ -313,12 +313,12 @@ for i in range(Nsims):
                 DLv=lbin, uCl=ctt_unlensed, lCl=ctt_unlensed, Nl=ntt, 
                 Clpp=cphiphi, w=w, b=b, compute_bias=False)
             if args.delens:
-                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
+                lcents, lp1d = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=False)
             else:
-                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                lcents, lp1d = SCALE.SCALE(lTmap+nmap, map_delens=None, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=False)
