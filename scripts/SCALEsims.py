@@ -158,7 +158,7 @@ if rank == 0: # Format some strings to create unique filename
     ## Construct unique filename based on argparse options
     l1str = '_{}-{}l1'.format(l1min, l1max)
     l2str = '_{}-{}l2'.format(l2min, l2max)
-    DLvstr = '_{}DLv'.format(DLv)
+    DLvstr = '_{}DLv'.format(DLn)
     nstr = '_{}uKarcmin_{}arcmin'.format(wn, bn)
     lensstr = '_{}lpa_{}-{}phi'.format(lpa, pmin, pmax)
     mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), rn, 
@@ -194,11 +194,12 @@ cphiphi[pmax:] = 0.
 ## Noise spectrum
 ntt = (w*np.pi/180./60.)**2. * np.exp((b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2.*ls**2.)
 
-ctt_total = ctt_lensed + ntt
 ## Replace potential nan here
 ctt_unlensed[0] = 0
 ctt_lensed[0] = 0
 cphiphi[0] = 0
+ntt[0] = 0
+ctt_total = ctt_lensed + ntt
 
 ## Simulation size/resolution
 box = np.array([[-5,width/2],[5,-width/2]]) * utils.degree
@@ -304,16 +305,10 @@ for i in range(Nsims):
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=True)
             else:
-                if args.delens:
-                    lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
-                        l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
-                        DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
-                        Clpp=cphiphi, w=w, b=b, compute_bias=True)
-                else:
-                    lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
-                        l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
-                        DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
-                        Clpp=cphiphi, w=w, b=b, compute_bias=True)
+                lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                    l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
+                    DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
+                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
             outs['ALv_lensed_DLv{}'.format(lbin)] = AL
             outs['PsiLv_DLv{}'.format(lbin)] = Psi
             print("Rank {} done initial step for Lbin {}".format(rank, lbin), flush=True)
