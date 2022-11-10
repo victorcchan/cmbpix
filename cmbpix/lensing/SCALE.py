@@ -1,4 +1,3 @@
-from tkinter import W
 import numpy as np
 import matplotlib.pyplot as plt
 from pixell import enmap, utils as putils
@@ -375,7 +374,7 @@ def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     shape, wcs = map_in.shape, map_in.wcs
     lmap = map_in.modlmap()
     if map_delens is not None:
-        Tlp = WienerFilter(map_delens, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
+        Tlp = WienerFilter(map_delens, ell, uCl, uCl, Nl, lmin=l2min, lmax=l2max, grad=True)
     else:
         Tlp = WienerFilter(map_in, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True)
     lam = Tlp[0]**2 + Tlp[1]**2
