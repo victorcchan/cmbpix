@@ -158,7 +158,7 @@ if rank == 0: # Format some strings to create unique filename
     ## Construct unique filename based on argparse options
     l1str = '_{}-{}l1'.format(l1min, l1max)
     l2str = '_{}-{}l2'.format(l2min, l2max)
-    DLvstr = '_{}DLv'.format(DLv)
+    DLvstr = '_{}DLv'.format(DLn)
     nstr = '_{}uKarcmin_{}arcmin'.format(wn, bn)
     lensstr = '_{}lpa_{}-{}phi'.format(lpa, pmin, pmax)
     mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), rn, 
