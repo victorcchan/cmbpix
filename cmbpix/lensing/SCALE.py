@@ -382,8 +382,8 @@ def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     sig = Thp[0]**2 + Thp[1]**2
     fc = FourierCalc(shape, wcs)
     p2d,_,_ = fc.power2d(lam, sig) # 2D cross-spectrum between lambda & sigma maps
-    B = l1max // DLv + 1
-    bins = np.arange(B) * DLv
+    nLv = l1max // DLv
+    bins = np.arange(0, nLv*DLv+1, DLv)
     binner = bin2D(lmap,bins)
     Lv, CLvls = binner.bin(p2d)
     if compute_bias:
