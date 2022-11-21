@@ -132,6 +132,10 @@ parser.add_argument("--delens",
     required=False, 
     action="store_true", 
     help="If used, use unlensed map to generate lambda maps.")
+parser.add_argument("--theory", 
+    required=False, 
+    action="store_true", 
+    help="If used, compute theory integrals for AL, PsiL.")
 args = parser.parse_args()
 DLv = np.array(args.DLv, dtype=int) ## Lv bin size
 l1min = args.l1min
@@ -145,7 +149,8 @@ reso = args.res
 Nsims = args.Nsims
 pmin = int(args.phimin)
 pmax = int(args.phimax)
-lpa=args.lpa
+lpa = args.lpa
+ints = args.theory
 
 if rank == 0: # Format some strings to create unique filename
     wn = str(w).replace('.', 'p')
@@ -198,7 +203,9 @@ ntt = (w*np.pi/180./60.)**2. * np.exp((b*np.pi/180./60. / np.sqrt(8.*np.log(2)))
 ctt_unlensed[0] = 0
 ctt_lensed[0] = 0
 cphiphi[0] = 0
-ntt[0] = 0
+ntt[0] = 1e-20
+if w == 0 and b == 0:
+    ntt += 1e-20
 ctt_total = ctt_lensed + ntt
 
 ## Simulation size/resolution
@@ -244,7 +251,7 @@ for lbin in DLv:
     outs['CLv_lensed_DLv{}'.format(lbin)] = np.empty([Nsims, l1max//lbin], dtype=np.float64)
 ## Loop over sims
 for i in range(Nsims):
-    if i % 10 == 0:
+    if i % (Nsims//10) == 0:
         print("{}% complete on rank {}".format(i, rank), flush=True)
     ## Generate maps
     Tmap = enmap.rand_map((1,) + shape, wcs, 
@@ -291,39 +298,41 @@ for i in range(Nsims):
             ucents, up1d, AL, Psi = SCALE.SCALE(Tmap+nmap, map_delens=None, 
                 l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                 DLv=lbin, uCl=ctt_unlensed, lCl=ctt_unlensed, Nl=ntt, 
-                Clpp=cphiphi, w=w, b=b, compute_bias=True)
+                Clpp=cphiphi, w=w, b=b, compute_bias=ints)
             if args.qe: ## Optimal noise is independent of realization; do once
                 N_l_phi = qe.N_l_optimal(shape,wcs,feed_dict,'hdv',XY,
                     xmask=xmask,ymask=ymask,field_names=None,kmask=kmask)
                 cents_phi, N0_l_bin = binner_phi.bin(N_l_phi)
                 outs['N0'] = N0_l_bin
             outs['Lv_DLv{}'.format(lbin)] = ucents
-            outs['ALv_unlensed_DLv{}'.format(lbin)] = AL
+            if ints:
+                outs['ALv_unlensed_DLv{}'.format(lbin)] = AL
             if args.delens: ## Delensing option --> Pass in unlensed map as well
                 lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
-                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
+                    Clpp=cphiphi, w=w, b=b, compute_bias=ints)
             else:
                 lcents, lp1d, AL, Psi = SCALE.SCALE(lTmap+nmap, map_delens=None, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
-                    Clpp=cphiphi, w=w, b=b, compute_bias=True)
-            outs['ALv_lensed_DLv{}'.format(lbin)] = AL
-            outs['PsiLv_DLv{}'.format(lbin)] = Psi
+                    Clpp=cphiphi, w=w, b=b, compute_bias=ints)
+            if ints:
+                outs['ALv_lensed_DLv{}'.format(lbin)] = AL
+                outs['PsiLv_DLv{}'.format(lbin)] = Psi
             print("Rank {} done initial step for Lbin {}".format(rank, lbin), flush=True)
         else:
-            ucents, up1d = SCALE.SCALE(Tmap+nmap, map_delens=None, 
+            ucents, up1d,_,_ = SCALE.SCALE(Tmap+nmap, map_delens=None, 
                 l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                 DLv=lbin, uCl=ctt_unlensed, lCl=ctt_unlensed, Nl=ntt, 
                 Clpp=cphiphi, w=w, b=b, compute_bias=False)
             if args.delens:
-                lcents, lp1d = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
+                lcents, lp1d,_,_ = SCALE.SCALE(lTmap+nmap, Tmap+nmap, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=False)
             else:
-                lcents, lp1d = SCALE.SCALE(lTmap+nmap, map_delens=None, 
+                lcents, lp1d,_,_ = SCALE.SCALE(lTmap+nmap, map_delens=None, 
                     l1min=l1min, l1max=l1max, l2min=l2min, l2max=l2max, 
                     DLv=lbin, uCl=ctt_unlensed, lCl=ctt_lensed, Nl=ntt, 
                     Clpp=cphiphi, w=w, b=b, compute_bias=False)
