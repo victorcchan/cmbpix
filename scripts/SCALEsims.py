@@ -106,6 +106,11 @@ parser.add_argument("--width",
     default=10, 
     type=float, 
     help="Map width in degrees")
+parser.add_argument("--height", 
+    required=False, 
+    default=10, 
+    type=float, 
+    help="Map height in degrees")
 parser.add_argument("--Nsims", 
     required=False, 
     default=100, 
@@ -145,6 +150,7 @@ l2max = args.l2max
 w = args.w ## In uK-arcmin
 b = args.b ## In arcmin
 width = args.width
+height = args.height
 reso = args.res
 Nsims = args.Nsims
 pmin = int(args.phimin)
@@ -166,7 +172,7 @@ if rank == 0: # Format some strings to create unique filename
     DLvstr = '_{}DLv'.format(DLn)
     nstr = '_{}uKarcmin_{}arcmin'.format(wn, bn)
     lensstr = '_{}lpa_{}-{}phi'.format(lpa, pmin, pmax)
-    mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*10), rn, 
+    mapstr  ='_{}sqdeg_{}arcmin_{}Nsims'.format(int(width*height), rn, 
                                                     int(Nsims*size))
     end = '.pkl'
     if args.delens:
@@ -209,7 +215,7 @@ if w == 0 and b == 0:
 ctt_total = ctt_lensed + ntt
 
 ## Simulation size/resolution
-box = np.array([[-5,width/2],[5,-width/2]]) * utils.degree
+box = np.array([[-height/2,width/2],[height/2,-width/2]]) * utils.degree
 shape, wcs = enmap.geometry(pos=box, res=reso*utils.arcmin, proj='car')
 modlmap = enmap.modlmap(shape, wcs)
 
@@ -251,8 +257,8 @@ for lbin in DLv:
     outs['CLv_lensed_DLv{}'.format(lbin)] = np.empty([Nsims, l1max//lbin], dtype=np.float64)
 ## Loop over sims
 for i in range(Nsims):
-    if i % (Nsims//10) == 0:
-        print("{}% complete on rank {}".format(i, rank), flush=True)
+    # if i % (Nsims//10) == 0:
+    #     print("{}% complete on rank {}".format(i, rank), flush=True)
     ## Generate maps
     Tmap = enmap.rand_map((1,) + shape, wcs, 
         interp(ls, ctt_unlensed)(modlmap)[np.newaxis, np.newaxis, :, :] )[0]
