@@ -15,6 +15,7 @@ def WienerFilter(map_in, ells, uCls, lCls, Nls, lmin, lmax, grad=False):
     cs = CubicSpline(ells, uCls / (lCls + Nls))
     lmap = map_in.modlmap()
     fl = cs(lmap)
+    fl[0,0] = 0.
     fl[(lmap < lmin) | (lmap > lmax)] = 0.
     if grad:
         ly, lx = map_in.lmap()
@@ -26,6 +27,7 @@ def InvVarFilter(map_in, ells, Cls, Nls, lmin, lmax, grad=False):
     cs = CubicSpline(ells, 1./(Cls + Nls))
     lmap = map_in.modlmap()
     fl = cs(lmap)
+    fl[0,0] = 0.
     fl[(lmap < lmin) | (lmap > lmax)] = 0.
     if grad:
         ly, lx = map_in.lmap()
