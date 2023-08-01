@@ -101,7 +101,8 @@ ctt_total = ctt_lensed + ntt
 print("Spectra computed, computing SCALE theory", flush=True)
 
 nLv = 3000 // args.DLv
-Lv = np.arange(0, nLv*args.DLv+1, args.DLv)
+Lv = np.arange(args.DLv/2, (nLv+1)*args.DLv, args.DLv, dtype=int)
+# Lv = np.arange(0, nLv*args.DLv+1, args.DLv)
 
 ALv, PsiLv = SCALE.CalcBiasExp(ctt_unlensed, ctt_total, cphiphi, 
 	l1min=args.l1min, l1max=args.l1max, l2min=args.l2min, l2max=args.l2max, 
