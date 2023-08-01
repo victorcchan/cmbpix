@@ -222,7 +222,7 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     return np.sum(integrand, axis=(-2,-1))
 
 def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, 
-    dl1=25, dl2=50, useC=True):
+    dl1=75, dl2=100, useC=True):
     """Return the normalization AL and expected Psi_L for the given spectra.
 
     Return the numerically integrated normalization factors AL as well as 
