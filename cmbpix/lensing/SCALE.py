@@ -6,7 +6,7 @@ from orphics.maps import binned_power, FourierCalc
 from orphics.stats import bin2D
 import symlens as s
 from scipy.interpolate import CubicSpline
-from cmbpix.lensing.SCALE_c import Psi_and_A_cy
+from cmbpix.lensing.SCALE_c import Psi_and_A_cy, Psi_and_A_cy_mc
 
 def ApplyFilter(map_in, Fl):
     return enmap.ifft(enmap.fft(map_in)*Fl).real
@@ -222,7 +222,7 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     return np.sum(integrand, axis=(-2,-1))
 
 def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, 
-    dl1=75, dl2=100, useC=True):
+    dl1=75, dl2=100, useMC=True, useC=True):
     """Return the normalization AL and expected Psi_L for the given spectra.
 
     Return the numerically integrated normalization factors AL as well as 
@@ -253,9 +253,11 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
         (Bigger effect on accuracy)
     dl2: int
         The integration step size for the l2 integral.
+    useMC: bool, default=True
+        If True, use Monte Carlo integration. Else, check useC.
     useC: bool, default=True
         If True, use the Cython implementation (~4*Ncores times faster). 
-        Else, use the pure Python implementation.
+        Else, use the pure Python implementation. Does nothing if useMC=True.
     
     Returns
     -------
@@ -272,7 +274,13 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
     ALv = np.zeros(np.shape(Lv)[0])
     PsiLv = np.zeros(np.shape(Lv)[0])
 
-    if useC:
+    if useMC:
+        for iL, LL in enumerate(Lv):
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
+                l2min, l2max, 200000, 1)
+        ALv *= (2*np.pi)**4
+        PsiLv /= (2*np.pi)**4
+    elif useC:
         for iL, LL in enumerate(Lv):
             PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
