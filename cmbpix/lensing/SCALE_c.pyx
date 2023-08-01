@@ -1,7 +1,6 @@
 cimport cython
 from cython.parallel import prange
-from libc.stdlib cimport rand, srand, RAND_MAX
-from libc.time cimport time
+from cython.cimports.libc.stdlib cimport rand, srand, RAND_MAX
 import numpy as np
 cimport numpy as np
 
@@ -81,6 +80,9 @@ def Psi_and_A_cy(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] C
     
     return integral, AL
 
+@cython.boundscheck(False)
+@cython.wraparound(False)
+@cython.cdivision(True)
 def Psi_and_A_cy_mc(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] Clphiphi, \
                  int l1min, int l1max, int l2min, int l2max, int n_samples, int dl=1):
     
