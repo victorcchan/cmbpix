@@ -1,6 +1,6 @@
 import numpy as np
 import healpy as hp
-from pixell import enmap, utils, curvedsky
+from pixell import enmap, utils#, curvedsky
 
 def ang2ell(a):
     """Convert the given angular scale(s) in arcmins to the analogous ell(s).
@@ -231,29 +231,29 @@ def add_noise(data, noise, pol=True):
         nmap[1:] *= np.sqrt(2)
     return nmap + data
 
-def alm2stripe(alm, width, resol, proj='car'):
-    """Return the stripe centered at dec=0 of the map corresponding to alm.
+# def alm2stripe(alm, width, resol, proj='car'):
+#     """Return the stripe centered at dec=0 of the map corresponding to alm.
     
-    Return a slice of the map corresponding to alm from declination -width/2 
-    to +width/2, and right ascension -180deg to +180deg.
+#     Return a slice of the map corresponding to alm from declination -width/2 
+#     to +width/2, and right ascension -180deg to +180deg.
     
-    Parameters
-    ----------
-    alm: array
-        The set of alms to convert to map-space.
-    width: value
-        The width of the map (centered at dec=0) in degrees.
-    resol: value
-        The resolution of the map in arcmin.
-    proj: str, default='car'
-        The projection of the map. Must be compatible with pixell.
+#     Parameters
+#     ----------
+#     alm: array
+#         The set of alms to convert to map-space.
+#     width: value
+#         The width of the map (centered at dec=0) in degrees.
+#     resol: value
+#         The resolution of the map in arcmin.
+#     proj: str, default='car'
+#         The projection of the map. Must be compatible with pixell.
     
-    Returns
-    -------
-    stmap: array
-        The output map.
-    """
-    box = np.array([[-width/2,180], [width/2,-180]]) * utils.degree
-    shape, wcs = enmap.geometry(pos=box, res=resol*utils.arcmin, proj=proj)
-    cmap = enmap.zeros(shape, wcs)
-    return curvedsky.alm2map(alm, cmap, method='cyl')
+#     Returns
+#     -------
+#     stmap: array
+#         The output map.
+#     """
+#     box = np.array([[-width/2,180], [width/2,-180]]) * utils.degree
+#     shape, wcs = enmap.geometry(pos=box, res=resol*utils.arcmin, proj=proj)
+#     cmap = enmap.zeros(shape, wcs)
+#     return curvedsky.alm2map(alm, cmap, method='cyl')
