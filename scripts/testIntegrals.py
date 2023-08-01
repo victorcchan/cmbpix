@@ -68,13 +68,15 @@ fn = 'SCALEintegral_{}DLv_{}dl1{}-{}_{}dl2{}-{}_{}w{}b.pkl'.format(args.DLv, arg
 if args.nonoise:
     fn = fn[:-4] + '_nonoise.pkl'
 
+tstart = time.time()
+
 ## Set up a new set of parameters for CAMB
 print("Running CAMB", flush=True)
 pars = camb.CAMBparams()
 ## This function sets up CosmoMC-like settings, 
 ## with one massive neutrino and helium set using BBN consistency
 pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122, mnu=0.06, omk=0, tau=0.06)
-pars.InitPower.set_params(As=2e-9, ns=0.965, r=0)
+pars.InitPower.set_params(As=2.1e-9, ns=0.965, r=0)
 pars.set_for_lmax(20000, lens_potential_accuracy=8);
 results = camb.get_results(pars)
 powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
@@ -93,31 +95,35 @@ ntt = (args.w*np.pi/180./60.)**2. * np.exp((args.b*np.pi/180./60. / np.sqrt(8.*n
 if args.nonoise:
     ntt = np.zeros(ntt.size) + 1e-20
 ## Replace potential nan here
-ntt[0] = 1e-20
-ctt_unlensed[0] = 1e-20
-ctt_lensed[0] = 1e-20
-cphiphi[0] = 1e-20
+ntt[:2] = 1e-20
+ctt_unlensed[:2] = 1e-20
+ctt_lensed[:2] = 1e-20
+cphiphi[:2] = 1e-20
 
 ctt_total = ctt_lensed + ntt
-print("Spectra computed, computing SCALE theory", flush=True)
+
+tmid = time.time()
+print("CAMB done, time taken: {}s".format(tmid-tstart), flush=True)
 
 nLv = 3000 // args.DLv
 Lv = np.arange(args.DLv/2, (nLv+1)*args.DLv, args.DLv, dtype=int)
+# Lv = np.arange(0, 2502, dtype=int)
 # Lv = np.arange(0, nLv*args.DLv+1, args.DLv)
-
-tstart = time.time()
 
 ALv, PsiLv = SCALE.CalcBiasExp(ctt_unlensed, ctt_total, cphiphi, 
 	l1min=args.l1min, l1max=args.l1max, l2min=args.l2min, l2max=args.l2max, 
-    Lv=Lv, dl1=args.dl1, dl2=args.dl2, useC=True)
+    Lv=Lv, dl1=args.dl1, dl2=args.dl2, useMC=True)
 
 tend = time.time()
 
-print("Time taken: {}s".format(tend-tstart), flush=True)
+print("SCALE theory done, time taken: {}s".format(tend-tmid), flush=True)
+print("Total time taken: {}s".format(tend-tstart), flush=True)
 
 out = {"Lv": Lv, 
 	   "ALv": ALv, 
 	   "PsiLv": PsiLv}
+
+print(out, flush=True)
 
 with open(loc+fn, 'wb') as p:
 	pickle.dump(out, p)
