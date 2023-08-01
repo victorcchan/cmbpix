@@ -3,6 +3,7 @@ from cmbpix.lensing import SCALE
 import camb
 import pickle
 import argparse
+import time
 
 import warnings
 warnings.filterwarnings(action='ignore') ## Change to once for first time
@@ -61,7 +62,7 @@ parser.add_argument("--b",
     help="Beam FWHM in arcmin")
 args = parser.parse_args()
 
-loc = '/scratch/p/pen/victorc/lensing/CLGK/integrals/' ## Change this for file location
+loc = './' ## Change this for file location
 fn = 'SCALEintegral_{}DLv_{}dl1{}-{}_{}dl2{}-{}_{}w{}b.pkl'.format(args.DLv, args.dl1,
     args.l1min, args.l1max, args.dl2, args.l2min, args.l2max, args.w, args.b)
 if args.nonoise:
@@ -104,9 +105,15 @@ nLv = 3000 // args.DLv
 Lv = np.arange(args.DLv/2, (nLv+1)*args.DLv, args.DLv, dtype=int)
 # Lv = np.arange(0, nLv*args.DLv+1, args.DLv)
 
+tstart = time.time()
+
 ALv, PsiLv = SCALE.CalcBiasExp(ctt_unlensed, ctt_total, cphiphi, 
 	l1min=args.l1min, l1max=args.l1max, l2min=args.l2min, l2max=args.l2max, 
     Lv=Lv, dl1=args.dl1, dl2=args.dl2, useC=True)
+
+tend = time.time()
+
+print("Time taken: {}s".format(tend-tstart), flush=True)
 
 out = {"Lv": Lv, 
 	   "ALv": ALv, 
