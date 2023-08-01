@@ -1,5 +1,6 @@
 import setuptools
 from Cython.Build import cythonize
+import numpy as np
 
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
@@ -23,7 +24,8 @@ setuptools.setup(
 	packages=setuptools.find_packages(include=["cmbpix", "cmbpix.lensing"]), 
 	python_requires=">=3", 
 	install_requires=["numpy", "healpy", "cython", "pixell", "matplotlib", 
-					  "mpi4py"], 
+                   		"mpi4py"], 
 	ext_modules=cythonize(extensions, 
 		compiler_directives={"language_level": "3"}), 
+	include_dirs=[np.get_include()], 
 )
