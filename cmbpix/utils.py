@@ -1,6 +1,11 @@
 import numpy as np
 import healpy as hp
 from pixell import enmap, utils#, curvedsky
+import camb
+
+# Useful constants
+r2d = 180. / np.pi # radians to degrees
+r2am = r2d * 60. # radians to arcmins
 
 def ang2ell(a):
     """Convert the given angular scale(s) in arcmins to the analogous ell(s).
@@ -36,6 +41,55 @@ def ell2ang(ell):
         The angular scale(s) corresponding to ell.
     """
     return 2 * 10800. / (ell + 1)
+
+def ellfac(ell, phi2k=False):
+    """Return the ell factor for the given ell(s).
+
+    Return the ell factor for the given ell(s) to convert C_ell to D_ell.
+    If phi2k is True, return the ell factor for converting C^{phiphi} to 
+    C^{kk}.
+
+    Parameters
+    ----------
+    ell: value, array of values
+        The ell mode(s).
+    phi2k: bool, default=False
+        If True, return the ell factor for converting C^{phiphi} to C^{kk}.
+        Otherwise, return the ell factor for converting C_ell to D_ell.
+    
+    Returns
+    -------
+    ellfac: float, array of floats
+        The ell factor for the given ell(s).
+    """
+    if phi2k:
+        return (ell*(ell+1.)*ell*(ell+1.)) / (2*np.pi)
+    else:
+        return ell*(ell+1.) / (2*np.pi)
+    
+def dcltt(ell, cltt, fsky=1., dell=1.):
+    """Return the minumum error on C_ell for the given ell(s).
+
+    Return the minimum error on C_ell for the given ell(s) for a given
+    sky fraction fsky and bin width dell.
+
+    Parameters
+    ----------
+    ell: value, array of values
+        The ell mode(s).
+    cltt: value, array of values
+        The C_ell value(s).
+    fsky: float, default=1.
+        The sky fraction.
+    dell: float (or array of matching size), default=1.
+        The bin width.
+
+    Returns
+    -------
+    dcltt: float, array of floats
+        The minimum error on C_ell for the given ell(s).
+    """
+    return np.sqrt(2 / ((2*ell+1.)*dell*fsky)) * cltt
 
 def patches(ind, NSIDEin, NSIDEout, nest=False):
     """Daughter pixel indices in a low resolution HEALPix patch.
@@ -230,6 +284,74 @@ def add_noise(data, noise, pol=True):
     elif form == 'enmap' and len(sh) > 2 and sh[0]> 1 and pol:
         nmap[1:] *= np.sqrt(2)
     return nmap + data
+
+def getPS(H0=67.5, ombh2=0.022, omch2=0.122, 
+          tau=0.06, As=2.1e-9, ns=0.965, mnu=0.06, 
+          lmax=20000, w=1.0, b=1.0, removeNaN=True):
+    """Return CMB power spectra from CAMB for given cosmological parameters.
+
+    Parameters
+    ----------
+    H0: float, default=67.5
+        Hubble constant in km/s/Mpc.
+    ombh2: float, default=0.022
+        Physical baryon density.
+    omch2: float, default=0.122
+        Physical cold dark matter density.
+    tau: float, default=0.06
+        Optical depth to reionization.
+    As: float, default=2.1e-9
+        Amplitude of the primordial power spectrum.
+    ns: float, default=0.965
+        Spectral index of the primordial power spectrum.
+    mnu: float, default=0.06
+        Sum of the neutrino masses in eV.
+    lmax: int, default=20000
+        Maximum multipole to compute.
+    w: float, default=1.0
+        White noise level in uK-arcmin.
+    b: float, default=1.0
+        Beam FWHM in arcmin.
+    removeNaN: bool, default=True
+        If True, replace NaNs from the power spectra with 1e-20.
+
+    Returns
+    -------
+    ls: array
+        The multipole values.
+    ctt_unlensed: array
+        The unlensed CMB temperature power spectrum.
+    ctt_lensed: array
+        The lensed CMB temperature power spectrum.
+    ntt: array
+        The noise power spectrum.
+    cphiphi: array
+        The lensing potential power spectrum.
+    """
+    pdict1 = dict(H0=H0, ombh2=ombh2, omch2=omch2, 
+                  mnu=mnu, omk=0, tau=tau)
+    pdict2 = dict(As=As, ns=ns, r=0)
+    pars = camb.CAMBparams()
+    pars.set_cosmology(**pdict1)
+    pars.InitPower.set_params(**pdict2)
+    pars.set_for_lmax(lmax, lens_potential_accuracy=8.);
+    results = camb.get_results(pars)
+    powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
+
+    ls = np.arange(powers['unlensed_scalar'].shape[0])
+    ## CAMB outputs l(l+1)/(2pi) * C_l by default, need to rescale
+    ctt_unlensed = powers['unlensed_scalar'][:,0]/ellfac(ls)
+    ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
+    ctt_lensed = powers['total'][:,0]/ellfac(ls)
+    cphiphi = powers['lens_potential'][:,0]/ellfac(ls, phi2k=True)
+    # Compute noise spectrum
+    ntt = (w/r2am)**2.*np.exp((b/r2am / np.sqrt(8.*np.log(2)))**2.*ls**2.)
+    if removeNaN:
+        ctt_unlensed[np.isnan(ctt_unlensed)|(ctt_unlensed==0)] = 1.e-20
+        ctt_lensed[np.isnan(ctt_lensed)|(ctt_lensed==0)] = 1.e-20
+        ntt[np.isnan(ntt)|(ntt==0)] = 1.e-20
+        cphiphi[np.isnan(cphiphi)|(cphiphi==0)] = 1.e-20
+    return ls, ctt_unlensed, ctt_lensed, ntt, cphiphi
 
 # def alm2stripe(alm, width, resol, proj='car'):
 #     """Return the stripe centered at dec=0 of the map corresponding to alm.
