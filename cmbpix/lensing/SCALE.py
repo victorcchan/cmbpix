@@ -277,7 +277,7 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
     if useMC:
         for iL, LL in enumerate(Lv):
             PsiLv[iL], ALv[iL] = Psi_and_A_cy_mc(LL, uCl, tCl, Clpp, l1min, l1max, 
-                l2min, l2max, 200000, 1)
+                l2min, l2max, 200000, 1) # 200k achieves ~1% error
         ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4
     elif useC:
