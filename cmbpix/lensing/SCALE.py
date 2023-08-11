@@ -402,7 +402,7 @@ def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     else:
         return Lv, CLvls, None, None
     
-def SCALEerror(Lv, CLv, ALv, fsky=1., dLv=1.):
+def SCALEerror(Lv, CLv, ALv, fsky=1., dLv=1., normed=False):
     """Return the minimum expected variance per mode of the SCALE spectrum.
 
     Parameters
@@ -417,10 +417,16 @@ def SCALEerror(Lv, CLv, ALv, fsky=1., dLv=1.):
         The fraction of the sky covered by the map.
     dLv: float or array, default=1.
         The size of the Lcheck bins.
+    normed: bool, default=False
+        If True, assumes that CLv is normalized (actually PsiLv)
 
     Returns
     -------
     dPsiLv: 1d-array
         The minimum expected variance per mode of the SCALE spectrum.
     """
-    return np.sqrt(((CLv*ALv)**2 + 4*ALv) / (fsky*dLv*(2*Lv+1)))
+    if normed:
+        PsiLv = CLv
+    else:
+        PsiLv = CLv*ALv
+    return np.sqrt((PsiLv**2 + 4*ALv) / (fsky*dLv*(2*Lv+1)))
