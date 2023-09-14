@@ -96,6 +96,7 @@ for i in range(Nsim):
     Tlen = lenspyx.alm2lenmap(tlm_unl, dlm, geometry=geom_info, verbose=1, epsilon=epsilon)
     # Free up some memory
     del dlm, tlm_unl
+    # Add noise
     nlm = synalm(ntt, lmax=lmax_unl, mmax=mmax_unl)
     Tlen += geom.alm2map(nlm, lmax_unl, mmax_unl, nthreads=os.cpu_count())
     del nlm
