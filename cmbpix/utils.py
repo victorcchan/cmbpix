@@ -285,9 +285,35 @@ def add_noise(data, noise, pol=True):
         nmap[1:] *= np.sqrt(2)
     return nmap + data
 
+def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
+    """Return a reverse logistic function for suppressing high ell modes.
+
+    Return a reverse logistic function for suppressing high ell modes of a 
+    CMB lensing power spectrum. Apply by multiplying cphiphi by the output 
+    and/or feeding the output into camb.results.get_partial_lensing_cls().
+
+    Parameters
+    ----------
+    Lmax: int, default=30000
+        Maximum multipole to compute.
+    L0: int, default=10000
+        Midpoint of the suppression.
+    kLens: float, default=1e-3
+        Steepness of the suppression.
+
+    Returns
+    -------
+    ALens: array
+        The suppression function.
+    """
+    L = np.arange(Lmax)
+    ALens = np.ones(Lmax, dtype=np.float64)
+    return ALens / (1 + np.exp(kLens*(L-L0)))
+
 def getPS(H0=67.5, ombh2=0.022, omch2=0.122, 
           tau=0.06, As=2.1e-9, ns=0.965, mnu=0.06, 
-          lmax=20000, w=1.0, b=1.0, removeNaN=True):
+          lmax=20000, w=1.0, b=1.0, L0=None, kLens=None, 
+          removeNaN=True):
     """Return CMB power spectra from CAMB for given cosmological parameters.
 
     Parameters
@@ -312,6 +338,10 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
         White noise level in uK-arcmin.
     b: float, default=1.0
         Beam FWHM in arcmin.
+    L0: int, default=None
+        Midpoint of the lensing suppression, if given.
+    kLens: float, default=None
+        Steepness of the suppression, if given.
     removeNaN: bool, default=True
         If True, replace NaNs from the power spectra with 1e-20.
 
@@ -341,9 +371,15 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
     ls = np.arange(powers['unlensed_scalar'].shape[0])
     ## CAMB outputs l(l+1)/(2pi) * C_l by default, need to rescale
     ctt_unlensed = powers['unlensed_scalar'][:,0]/ellfac(ls)
-    ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
-    ctt_lensed = powers['total'][:,0]/ellfac(ls)
     cphiphi = powers['lens_potential'][:,0]/ellfac(ls, phi2k=True)
+    ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
+    if L0 is not None and kLens is not None:
+        Alens = Asuppress(ls.size, L0, kLens)
+        partp = results.get_partially_lensed_cls(Alens=ALens, raw_cl=True, CMB_unit='muK')
+        ctt_lensed = partp[:,0]
+        cphiphi *= Alens
+    else:
+        ctt_lensed = powers['total'][:,0]/ellfac(ls)
     # Compute noise spectrum
     ntt = (w/r2am)**2.*np.exp((b/r2am / np.sqrt(8.*np.log(2)))**2.*ls**2.)
     if removeNaN:
