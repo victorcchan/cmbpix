@@ -314,7 +314,7 @@ def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
 
 def getPS(H0=67.5, ombh2=0.022, omch2=0.122, 
           tau=0.06, As=2.1e-9, ns=0.965, mnu=0.06, 
-          lmax=20000, w=1.0, b=1.0, L0=None, kLens=None, 
+          L0=None, kLens=None, lmax=20000, w=1.0, b=1.0, 
           removeNaN=True):
     """Return CMB power spectra from CAMB for given cosmological parameters.
 
@@ -334,16 +334,16 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
         Spectral index of the primordial power spectrum.
     mnu: float, default=0.06
         Sum of the neutrino masses in eV.
+    L0: int, default=None
+        Midpoint of the lensing suppression, if given.
+    kLens: float, default=None
+        Steepness of the suppression, if given.
     lmax: int, default=20000
         Maximum multipole to compute.
     w: float, default=1.0
         White noise level in uK-arcmin.
     b: float, default=1.0
         Beam FWHM in arcmin.
-    L0: int, default=None
-        Midpoint of the lensing suppression, if given.
-    kLens: float, default=None
-        Steepness of the suppression, if given.
     removeNaN: bool, default=True
         If True, replace NaNs from the power spectra with 1e-20.
 
