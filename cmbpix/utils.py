@@ -299,7 +299,7 @@ def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
     L0: int, default=10000
         Midpoint of the suppression.
     kLens: float, default=1e-3
-        Steepness of the suppression.
+        Steepness of the suppression. If negative, use exp(kLens).
 
     Returns
     -------
@@ -308,6 +308,8 @@ def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
     """
     L = np.arange(Lmax)
     ALens = np.ones(Lmax, dtype=np.float64)
+    if kLens < 0:
+        kLens = np.exp(kLens)
     return ALens / (1 + np.exp(kLens*(L-L0)))
 
 def getPS(H0=67.5, ombh2=0.022, omch2=0.122, 
