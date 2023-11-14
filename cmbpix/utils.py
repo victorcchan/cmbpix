@@ -379,7 +379,7 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
         ALens = Asuppress(ls.size, L0, kLens)
         partp = results.get_partially_lensed_cls(Alens=ALens, raw_cl=True, CMB_unit='muK')
         ctt_lensed = partp[:,0]
-        cphiphi *= Alens
+        cphiphi *= ALens
     else:
         ctt_lensed = powers['total'][:,0]/ellfac(ls)
     # Compute noise spectrum
