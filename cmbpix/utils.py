@@ -22,7 +22,7 @@ def ang2ell(a):
     ell: float, array of floats
         The ell mode(s) corresponding to a.
     """
-    return (2 / a / 10800.) + 1
+    return (2 * 10800. / a) - 1
 
 def ell2ang(ell):
     """Convert the given ell(s) to its analogous angular scale(s) in arcmins.
