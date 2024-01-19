@@ -15,7 +15,7 @@ extensions = [setuptools.Extension("cmbpix.lensing.SCALE_c",
 
 setuptools.setup(
 	name="cmbpix", 
-	version="0.1.0.dev0", 
+	version="1.0.0", 
 	author="Victor C. Chan", 
 	author_email="chan@astro.utoronto.ca", 
 	description="Tools for pixel-based CMB analysis", 
