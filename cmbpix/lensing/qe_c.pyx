@@ -155,14 +155,8 @@ def N1_bias_integral_cy_Kesden_mc(int LL, double[:] ClTTunlensed, double[:] ClTT
         l2x = l2_vals[j,0]
         l2y = l2_vals[j,1]
 
-        Ldotl1 = l1x*L
-        LdotLminusl1 = L*(L-l1x)
-
         modl1 = <int> ((l1x*l1x+l1y*l1y)**(0.5))
         modLminusl1 = <int> (((L-l1x)*(L-l1x) + l1y*l1y)**(0.5))
-        
-        Ldotl2 = l2x*L
-        LdotLminusl2 = L*(L-l2x)
         
         if (modl1 < lmin or modl1 > lmax):
             continue
@@ -176,6 +170,11 @@ def N1_bias_integral_cy_Kesden_mc(int LL, double[:] ClTTunlensed, double[:] ClTT
             elif (modLminusl2 < lmin or modLminusl2 > lmax):
                 continue
             else:
+                Ldotl1 = l1x*L
+                LdotLminusl1 = L*(L-l1x)
+                Ldotl2 = l2x*L
+                LdotLminusl2 = L*(L-l2x)
+
                 modl1minusLplusl2 = <int> (((l1x-L+l2x)*(l1x-L+l2x) + (l1y+l2y)*(l1y+l2y))**(0.5))
                 modl1minusl2 = <int> (((l1x-l2x)*(l1x-l2x) + (l1y-l2y)*(l1y-l2y))**(0.5))
                 #l1dotl1minusl2 = l1x*(l1x-l2x)+l1y*(l1y-l2y)
