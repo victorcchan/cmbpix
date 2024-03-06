@@ -11,6 +11,10 @@ extensions = [setuptools.Extension("cmbpix.lensing.SCALE_c",
 	["cmbpix/lensing/SCALE_c.pyx"], 
 	extra_compile_args=['-fopenmp'], 
 	extra_link_args=['-fopenmp']), 
+              setuptools.Extension("cmbpix.lensing.qe_c", 
+	["cmbpix/lensing/qe_c.pyx"], 
+	extra_compile_args=['-fopenmp'], 
+	extra_link_args=['-fopenmp']), 
 ]
 
 setuptools.setup(
