@@ -1,5 +1,5 @@
 import numpy as np
-from cmbpix.lensing.qe_c import N1_bias_integral_cy_Kesden, N1_bias_integral_cy_Kesden_mc
+from cmbpix.lensing.qe_c import N1_bias_integral_cy_Kesden, N1_bias_integral_cy_Kesden_mc, N1_bias_integral_cy_Hanson
 
 def N0_bias_integral(l1xv, l1yv, Lv, ClTTunlensed, ClTTtotal, l1min = 30, l1max = 8000):
     
@@ -31,7 +31,7 @@ def N0_bias_integral(l1xv, l1yv, Lv, ClTTunlensed, ClTTtotal, l1min = 30, l1max 
     
     return np.sum(integrand, axis=(-2,-1))
 
-def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0):
+def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0, version=0):
     """
     Compute the N1 lensing bias for the power spectrum of the lensing potential
     using the Kesden et al. (2002) estimator.
@@ -62,9 +62,15 @@ def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0):
         N1 lensing bias for the power spectrum of the lensing potential.
     """
     N1 = np.zeros(np.size(Ls))
+    if version == 0:
+        N1func = N1_bias_integral_cy_Kesden
+    elif version == 1 and n_samps > 0:
+        N1func = N1_bias_integral_cy_Kesden_mc
+    elif version == 2:
+        N1func = N1_bias_integral_cy_Hanson
     for iL, LL in enumerate(Ls):
         if n_samps > 0:
-            N1[iL] = N1_bias_integral_cy_Kesden_mc(LL, uCl, tCl, Clpp, lmin, lmax, dl, n_samps)
+            N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl, n_samps)
         else:
-            N1[iL] = N1_bias_integral_cy_Kesden(LL, uCl, tCl, Clpp, lmin, lmax, dl)
+            N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl)
     return N1
