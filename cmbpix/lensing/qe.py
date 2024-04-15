@@ -73,4 +73,4 @@ def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0, version=0
             N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl, n_samps)
         else:
             N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl)
-    return N1
+    return N1 / ((2.0*np.pi)**4)
