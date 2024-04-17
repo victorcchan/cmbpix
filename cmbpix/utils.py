@@ -285,7 +285,7 @@ def add_noise(data, noise, pol=True):
         nmap[1:] *= np.sqrt(2)
     return nmap + data
 
-def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
+def Asuppress(Lmax=30000, L0=10000, kLens=1e-3, Amax=0.):
     """Return a reverse logistic function for suppressing high ell modes.
 
     Return a reverse logistic function for suppressing high ell modes of a 
@@ -300,22 +300,25 @@ def Asuppress(Lmax=30000, L0=10000, kLens=1e-3):
         Midpoint of the suppression.
     kLens: float, default=1e-3
         Steepness of the suppression. If negative, use exp(kLens).
+    Amax: float, default=0.
+        Maximum amount of suppression. Give values between 0 and 1.
+        I.e., minimum of the function is (1-Amax)
 
     Returns
     -------
     ALens: array
         The suppression function.
     """
-    L = np.arange(Lmax)
-    ALens = np.ones(Lmax, dtype=np.float64)
+    L = np.arange(Lmax+1)
+    ALens = np.ones(Lmax+1, dtype=np.float64)
     if kLens < 0:
         kLens = np.exp(kLens)
-    return ALens / (1 + np.exp(kLens*(L-L0)))
+    return ALens * Amax / (1 + np.exp(kLens*(L-L0))) + (1-Amax)
 
 def getPS(H0=67.5, ombh2=0.022, omch2=0.122, 
           tau=0.06, As=2.1e-9, ns=0.965, mnu=0.06, 
-          L0=None, kLens=None, lmax=20000, w=1.0, b=1.0, 
-          removeNaN=True):
+          L0=None, kLens=None, Amax=0., lmax=20000, 
+          w=1.0, b=1.0, lensresponse=False, removeNaN=True):
     """Return CMB power spectra from CAMB for given cosmological parameters.
 
     Parameters
@@ -338,12 +341,16 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
         Midpoint of the lensing suppression, if given.
     kLens: float, default=None
         Steepness of the suppression, if given.
+    Amax: float, default=0.
+        Maximum amount of suppression, if given.
     lmax: int, default=20000
         Maximum multipole to compute.
     w: float, default=1.0
         White noise level in uK-arcmin.
     b: float, default=1.0
         Beam FWHM in arcmin.
+    lensresponse: bool, default=False
+        If True, return the ClTgradT as ctt_unlensed.
     removeNaN: bool, default=True
         If True, replace NaNs from the power spectra with 1e-20.
 
@@ -353,6 +360,7 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
         The multipole values.
     ctt_unlensed: array
         The unlensed CMB temperature power spectrum.
+        This is ClTgradT if lensresponse is True.
     ctt_lensed: array
         The lensed CMB temperature power spectrum.
     ntt: array
@@ -370,18 +378,21 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
     results = camb.get_results(pars)
     powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
 
-    ls = np.arange(powers['unlensed_scalar'].shape[0])
+    ls = np.arange(lmax+1)
     ## CAMB outputs l(l+1)/(2pi) * C_l by default, need to rescale
-    ctt_unlensed = powers['unlensed_scalar'][:,0]/ellfac(ls)
-    cphiphi = powers['lens_potential'][:,0]/ellfac(ls, phi2k=True)
+    ctt_unlensed = powers['unlensed_scalar'][:lmax+1,0]/ellfac(ls)
+    cphiphi = powers['lens_potential'][:lmax+1,0]/ellfac(ls, phi2k=True)
     ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
     if L0 is not None and kLens is not None:
-        ALens = Asuppress(ls.size, L0, kLens)
+        ALens = Asuppress(lmax, L0, kLens, Amax)
         partp = results.get_partially_lensed_cls(Alens=ALens, raw_cl=True, CMB_unit='muK')
-        ctt_lensed = partp[:,0]
+        ctt_lensed = partp[:lmax+1,0]
         cphiphi *= ALens
     else:
-        ctt_lensed = powers['total'][:,0]/ellfac(ls)
+        ctt_lensed = powers['total'][:lmax+1,0]/ellfac(ls)
+    if lensresponse:
+        gradp = results.get_lensed_gradient_cls(lmax=lmax, raw_cl=True, CMB_unit='muK')
+        ctt_unlensed = gradp[:lmax+1,0]
     # Compute noise spectrum
     ntt = (w/r2am)**2.*np.exp((b/r2am / np.sqrt(8.*np.log(2)))**2.*ls**2.)
     if removeNaN:
