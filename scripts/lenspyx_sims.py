@@ -1,3 +1,6 @@
+import mpi4py.rc ## These first 3 lines allow mpi4py to work on Scinet
+mpi4py.rc.threads = False
+mpi4py.rc.finalize = True
 import os
 import numpy as np
 import camb
@@ -111,8 +114,10 @@ fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+'_Njob'+str(Nj)+'.npz'
 # ctt_total = ctt_lensed + ntt
 ls, ctt_unlensed, ctt_lensed, ntt, cphiphi = getPS(lmax=35000)
 ctt_total = ctt_lensed + ntt
+print("Power spectra generated", flush=True)
 
 if doQE:
+    print("Preparing QE", flush=True)
     l0, ctt_response, ctt_lens, ntt_lens, cphirec = getPS(lmax=8000, lensresponse=True)
     ucls, tcls = build_cl_dicts(ctt_response, ctt_lens+ntt_lens, cphirec * (l0*(l0+1)/2.)**2)
     ALs = get_norms(['TT'],ucls,ucls,tcls,lmin,lmax,k_ellmax=mlmax)
@@ -137,6 +142,7 @@ geom_info = ('healpix', {'nside':8192}) # map accuracy is good to ell~2*NSIDE
 geom = lenspyx.get_geom(geom_info)
 
 for i in range(Nsim):
+    print("Beginning realization", i, flush=True)
     # Generate raw Tmap and phimap alms
     tlm_unl = synalm(ctt_unlensed, lmax=lmax_unl, mmax=mmax_unl)
     CttU[i] = alm2cl(tlm_unl, tlm_unl, lmax_unl, lmax_unl, lmax_unl)[:lmax_len+1]
@@ -159,8 +165,10 @@ for i in range(Nsim):
     # Computed lensed CMB power spectrum
     tlm_len = geom.map2alm(np.copy(Tlen), lmax_len, lmax_len, nthreads=os.cpu_count())
     CttL[i] = alm2cl(tlm_len, tlm_len, lmax_len, lmax_len, lmax_len)
+    print("Realization", i, "generated", flush=True)
     
     if doQE:
+        print("Starting QE", i, flush=True)
         alm_out = change_alm_lmax(tlm_len, mlmax)
         Xdat = isotropic_filter(np.array([alm_out, alm_out, alm_out]),tcls,lmin,lmax,ignore_te=True)
         reconst = plensing.phi_to_kappa(qe_nobh(Xdat,Xdat)) # Reconstruct phi and convert to kappa
@@ -173,10 +181,12 @@ for i in range(Nsim):
                                 tcls['TT'][:clen]**2/CttL[i,:clen])
         AgTT2[np.where(AgTT2==0)] = 1e30
         RDN0s[i] = (Ls*(Ls+1)/2.)**2 * N0p**2 * (1./AgTT2)
+        print("QE for realization", i, "completed", flush=True)
 
     del Tlen
 
     ## Beyond here is SCALE
+    print("Starting SCALE", i, flush=True)
     # Do low pass once; reuse lambda alms
     LP = np.ones(lmax_len+1)*np.sqrt(np.arange(lmax_len + 1, dtype=float) * np.arange(1, lmax_len + 2)) * ctt_unlensed[:lmax_len+1] / ctt_total[:lmax_len+1]
     LP[(el_len > 3000)] = 0.
@@ -189,8 +199,10 @@ for i in range(Nsim):
     del lam
     llm = geom.map2alm(lmap, lmax_len, lmax_len, nthreads=os.cpu_count())
     del lmap
+    print("Lambda done", i, flush=True)
 
     for j in range(l1min.size):
+        print("Beginning sigma", l1min[j], "to", l1max[j], "for", i, flush=True)
         HP = np.ones(lmax_len+1)*np.sqrt(np.arange(lmax_len + 1, dtype=float) * np.arange(1, lmax_len + 2)) / ctt_total[:lmax_len+1]
         HP[(el_len < l1min[j])|(el_len > l1max[j])] = 0.
         tlm_hp = almxfl(tlm_len, HP, None, False)
@@ -205,6 +217,7 @@ for i in range(Nsim):
         del smap
 
         CLGKs[i,j] = alm2cl(slm, llm, lmax_len, lmax_len, lmax_len)
+        print("Finished SCALE", l1min[j], "to", l1max[j], "for", i, flush=True)
 
         del slm
 
