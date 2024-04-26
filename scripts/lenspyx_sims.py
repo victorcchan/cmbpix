@@ -89,6 +89,7 @@ if doQE:
 fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+'_Njob'+str(Nj)+'.npz'
 
 ## This generates the power spectra for the lensed and unlensed CMB
+print("Generating power spectra", flush=True)
 # pars = camb.CAMBparams()
 # pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122, omk=0, tau=0.06)# , mnu=0.06
 # pars.InitPower.set_params(As=2.1e-9, ns=0.965, r=0)
