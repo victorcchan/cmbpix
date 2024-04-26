@@ -46,7 +46,10 @@ l1minstr = ','.join(l1min.astype(str))
 l1maxstr = ','.join(l1max.astype(str))
 doQE = args.qe
 
+print("Script initiated, running", Nsim, "sims", flush=True)
+
 if doQE:
+    print("Will do QE, importing relevant packages", flush=True)
     from pytempura import get_norms, norm_lens # To get RDN0
     from falafel import qe # QE setup functions
     from falafel.utils import change_alm_lmax, isotropic_filter
