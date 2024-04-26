@@ -3,6 +3,7 @@ import numpy as np
 import camb
 import lenspyx
 from lenspyx.utils_hp import synalm, almxfl, alm2cl
+from cmbpix.utils import getPS, ellfac
 import argparse
 
 ## Test params
@@ -29,6 +30,10 @@ parser.add_argument("--l1max",
     type=int, 
     nargs='+', 
     help="Upper limit for small-scale filtering")
+parser.add_argument("--qe", 
+    required=False, 
+    action="store_true", 
+    help="If used, run QE and save with outputs")
 args = parser.parse_args()
 Nsim = args.Nsim
 Nj = args.Njob
@@ -36,36 +41,86 @@ l1min = np.array(args.l1min, dtype=int)
 l1max = np.array(args.l1max, dtype=int)
 l1minstr = ','.join(l1min.astype(str))
 l1maxstr = ','.join(l1max.astype(str))
+doQE = args.qe
+
+if doQE:
+    from pytempura import get_norms, norm_lens # To get RDN0
+    from falafel import qe # QE setup functions
+    from falafel.utils import change_alm_lmax, isotropic_filter
+    import solenspipe # QE function(s)
+    from pixell import lensing as plensing,curvedsky as cs # Some utilities used
+    # QE configuration
+    lmin = 2; lmax = 3000 # Filter window
+    mlmax = 4000 #int(4000 * (args.lmax / 3000)) # reconstruction limit
+    # Can change limit to ~2k, ACT goes to 800 or 1300 depending
+    Ls = np.arange(mlmax+1)
+    Lkfac = (Ls*(Ls+1)/2.)**2
+    
+    # Geometry
+    nside = 2048 # utils.closest_nside(args.lmax)
+    shape = None ; wcs = None
+    print(f"NSIDE: {nside}")
+        
+    # Only for CAR
+    # px_arcmin = 2.0  / (args.lmax / 3000)
+    # shape,wcs = enmap.fullsky_geometry(res=np.deg2rad(px_arcmin/60.),proj='car')
+    # nside = None
+    # print(f"shape,wcs: {shape}, {wcs}")
+    px = qe.pixelization(shape=shape,wcs=wcs,nside=nside)
+
+    def build_cl_dicts(ucl, tcl, cphi):
+        """Organize input power spectra into dictionaries that go into pytempura
+        """
+        ucls = {'TT': ucl, 'EE': ucl, 
+                'BB': ucl, 'TE': ucl, 'kk': cphi} # ClTgradT for TT
+        # total/lensed (observed) Cls, add noise here if desired
+        # tcls = {'TT': rawp['total'][:,0], 'EE': rawp['total'][:,1], 
+        #         'BB': rawp['total'][:,2], 'TE': rawp['total'][:,3]}
+        tcls = {'TT': tcl, 'EE': tcl, 
+                'BB': tcl, 'TE': tcl}
+        return ucls, tcls
 
 fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+'_Njob'+str(Nj)+'.npz'
 
-# This generates the power spectra for the lensed and unlensed CMB
-pars = camb.CAMBparams()
-pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122, omk=0, tau=0.06)# , mnu=0.06
-pars.InitPower.set_params(As=2.1e-9, ns=0.965, r=0)
-pars.set_for_lmax(35000, lens_potential_accuracy=8);
-results = camb.get_results(pars)
-powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
+## This generates the power spectra for the lensed and unlensed CMB
+# pars = camb.CAMBparams()
+# pars.set_cosmology(H0=67.5, ombh2=0.022, omch2=0.122, omk=0, tau=0.06)# , mnu=0.06
+# pars.InitPower.set_params(As=2.1e-9, ns=0.965, r=0)
+# pars.set_for_lmax(35000, lens_potential_accuracy=8);
+# results = camb.get_results(pars)
+# powers =results.get_cmb_power_spectra(pars, CMB_unit='muK')
 
-ls = np.arange(powers['unlensed_scalar'].shape[0])
-## CAMB outputs l(l+1)/(2pi) * C_l by default, need to rescale
-ell_fac = ls*(ls+1.)/(2*np.pi)
-ctt_unlensed = (powers['unlensed_scalar'][:,0]/ell_fac)
-## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
-ctt_lensed = (powers['total'][:,0]/ell_fac)
-ell_fac_phi = (ls*(ls+1.)*ls*(ls+1.))/(2*np.pi)
-cphiphi = (powers['lens_potential'][:,0]/ell_fac_phi)
+# ls = np.arange(powers['unlensed_scalar'].shape[0])
+# ## CAMB outputs l(l+1)/(2pi) * C_l by default, need to rescale
+# ell_fac = ls*(ls+1.)/(2*np.pi)
+# ctt_unlensed = (powers['unlensed_scalar'][:,0]/ell_fac)
+# ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
+# ctt_lensed = (powers['total'][:,0]/ell_fac)
+# ell_fac_phi = (ls*(ls+1.)*ls*(ls+1.))/(2*np.pi)
+# cphiphi = (powers['lens_potential'][:,0]/ell_fac_phi)
 
-## Noise spectrum
-w = 1.0
-b = 1.0
-ntt = (w*np.pi/180./60.)**2. * np.exp((b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2.*ls**2.)
-## Replace potential nan here
-ntt[:2] = 1e-20
-ctt_unlensed[:2] = 1e-20
-ctt_lensed[:2] = 1e-20
-cphiphi[:2] = 1e-20
+# ## Noise spectrum
+# w = 1.0
+# b = 1.0
+# ntt = (w*np.pi/180./60.)**2. * np.exp((b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2.*ls**2.)
+# ## Replace potential nan here
+# ntt[:2] = 1e-20
+# ctt_unlensed[:2] = 1e-20
+# ctt_lensed[:2] = 1e-20
+# cphiphi[:2] = 1e-20
+# ctt_total = ctt_lensed + ntt
+ls, ctt_unlensed, ctt_lensed, ntt, cphiphi = getPS(lmax=35000)
 ctt_total = ctt_lensed + ntt
+
+if doQE:
+    l0, ctt_response, ctt_lens, ntt_lens, cphirec = getPS(lmax=8000, lensresponse=True)
+    ucls, tcls = build_cl_dicts(ctt_response, ctt_lens+ntt_lens, cphirec * (l0*(l0+1)/2.)**2)
+    ALs = get_norms(['TT'],ucls,ucls,tcls,lmin,lmax,k_ellmax=mlmax)
+    N0p = ALs['TT'][0]
+    N0k = (Ls*(Ls+1)/2.)**2 * ALs['TT'][0]
+    qe_nobh = solenspipe.get_qfunc(px,ucls,mlmax,'TT',Al1=ALs['TT'],est2=None,Al2=None,R12=None)
+    CLkk_rec = np.zeros((Nsim, mlmax+1))
+    RDN0s = np.zeros((Nsim, mlmax+1))
 
 lmax_len = 24000
 dlmax = 2048  # lmax of the unlensed fields is lmax + dlmax.  (some buffer is required for accurate lensing at lmax)
@@ -104,6 +159,20 @@ for i in range(Nsim):
     # Computed lensed CMB power spectrum
     tlm_len = geom.map2alm(np.copy(Tlen), lmax_len, lmax_len, nthreads=os.cpu_count())
     CttL[i] = alm2cl(tlm_len, tlm_len, lmax_len, lmax_len, lmax_len)
+    
+    if doQE:
+        alm_out = change_alm_lmax(tlm_len, mlmax)
+        Xdat = isotropic_filter(np.array([alm_out, alm_out, alm_out]),tcls,lmin,lmax,ignore_te=True)
+        reconst = plensing.phi_to_kappa(qe_nobh(Xdat,Xdat)) # Reconstruct phi and convert to kappa
+        CLkk_rec[i] = cs.alm2cl(reconst[0],reconst[0]) # Take the power spectrum and save
+        # Compute RDN0
+        clen = min(CttL[i].size, ucls['TT'].size)
+        AgTT2,AcTT2=norm_lens.qtt(mlmax, lmin, lmax, 
+                                ucls['TT'][:clen],
+                                ucls['TT'][:clen],
+                                tcls['TT'][:clen]**2/CttL[i,:clen])
+        AgTT2[np.where(AgTT2==0)] = 1e30
+        RDN0s[i] = (Ls*(Ls+1)/2.)**2 * N0p**2 * (1./AgTT2)
 
     del Tlen
 
@@ -142,7 +211,7 @@ for i in range(Nsim):
     del llm, tlm_len
 
 
-np.savez("lenspyxNSIDE8192_wSCALE"+fn_suff, CttU=CttU, CttL=CttL, CLGKs=CLGKs)
+np.savez("lenspyxNSIDE8192_wSCALE"+fn_suff, CttU=CttU, CttL=CttL, CLGKs=CLGKs, CLkk_rec=CLkk_rec, RDN0=RDN0s)
 
 # var = [10000, 11000, 12000, 13000, 14000, 15000] # desired lmax of the lensed field.
 # var = [512, 1024, 2048, 4096]
