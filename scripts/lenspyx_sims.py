@@ -4,6 +4,7 @@ mpi4py.rc.finalize = True
 import os
 import numpy as np
 import camb
+import healpy as hp # Temporary for qe funcs
 import lenspyx
 from lenspyx.utils_hp import synalm, almxfl, alm2cl
 from cmbpix.utils import getPS, ellfac
@@ -52,7 +53,7 @@ if doQE:
     print("Will do QE, importing relevant packages", flush=True)
     from pytempura import get_norms, norm_lens # To get RDN0
     from falafel import qe # QE setup functions
-    from falafel.utils import change_alm_lmax, isotropic_filter
+    # from falafel.utils import change_alm_lmax, isotropic_filter
     import solenspipe # QE function(s)
     from pixell import lensing as plensing,curvedsky as cs # Some utilities used
     # QE configuration
@@ -85,6 +86,62 @@ if doQE:
         tcls = {'TT': tcl, 'EE': tcl, 
                 'BB': tcl, 'TE': tcl}
         return ucls, tcls
+    
+    # Temporary functions; falafel.utils does not import well on Niagara
+    def change_alm_lmax(alms, lmax, dtype=np.complex128):
+        ilmax  = hp.Alm.getlmax(alms.shape[-1])
+        olmax  = lmax
+        oshape     = list(alms.shape)
+        oshape[-1] = hp.Alm.getsize(olmax)
+        oshape     = tuple(oshape)
+        alms_out   = np.zeros(oshape, dtype = dtype)
+        flmax      = min(ilmax, olmax)
+        for m in range(flmax+1):
+            lminc = m
+            lmaxc = flmax
+            idx_isidx = hp.Alm.getidx(ilmax, lminc, m)
+            idx_ieidx = hp.Alm.getidx(ilmax, lmaxc, m)
+            idx_osidx = hp.Alm.getidx(olmax, lminc, m)
+            idx_oeidx = hp.Alm.getidx(olmax, lmaxc, m)
+            alms_out[..., idx_osidx:idx_oeidx+1] = alms[..., idx_isidx:idx_ieidx+1].copy()
+        return alms_out
+
+
+    def isotropic_filter(alm,tcls,lmin,lmax,ignore_te=True):
+        # Filter isotropically
+        tcltt = tcls['TT']
+        tclee = tcls['EE']
+        tclte = tcls['TE']
+        tclbb = tcls['BB']
+        if ignore_te:
+            filt_T = tcltt*0
+            filt_E = tclee*0
+            filt_B = tclbb*0
+            ells = np.arange(tcltt.size)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                filt_T[2:] = 1./tcltt[2:]
+                filt_E[2:] = 1./tclee[2:]
+                filt_B[2:] = 1./tclbb[2:]
+            talm = qe.filter_alms(alm[0],filt_T,lmin=lmin,lmax=lmax)
+            ealm = qe.filter_alms(alm[1],filt_E,lmin=lmin,lmax=lmax)
+            balm = qe.filter_alms(alm[2],filt_B,lmin=lmin,lmax=lmax)
+        else:
+            filt_T_T = tcltt*0
+            filt_E_T = tclee*0
+            filt_T_E = tcltt*0
+            filt_E_E = tclee*0
+            filt_B = tclbb*0
+            with np.errstate(divide='ignore', invalid='ignore'):
+                filt_T_T[2:] = tclee[2:]/(tcltt[2:]*tclee[2:] - tclte[2:]**2.)
+                filt_T_E[2:] = -tclte[2:]/(tcltt[2:]*tclee[2:] - tclte[2:]**2.)
+                filt_E_T[2:] = -tclte[2:]/(tcltt[2:]*tclee[2:] - tclte[2:]**2.)
+                filt_E_E[2:] = tcltt[2:]/(tcltt[2:]*tclee[2:] - tclte[2:]**2.)
+                filt_B[2:] = 1./tclbb[2:]
+            talm = qe.filter_alms(alm[0],filt_T_T,lmin=lmin,lmax=lmax) + qe.filter_alms(alm[1],filt_T_E,lmin=lmin,lmax=lmax)
+            ealm = qe.filter_alms(alm[0],filt_E_T,lmin=lmin,lmax=lmax) + qe.filter_alms(alm[1],filt_E_E,lmin=lmin,lmax=lmax)
+            balm = qe.filter_alms(alm[2],filt_B,lmin=lmin,lmax=lmax)
+            
+        return [talm,ealm,balm]
 
 fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+'_Njob'+str(Nj)+'.npz'
 
