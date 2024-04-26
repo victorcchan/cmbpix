@@ -391,7 +391,10 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
     else:
         ctt_lensed = powers['total'][:lmax+1,0]/ellfac(ls)
     if lensresponse:
-        gradp = results.get_lensed_gradient_cls(lmax=lmax, raw_cl=True, CMB_unit='muK')
+        # lensed gradient function expects a longer array than we have
+        cphi_pad = np.pad(cphiphi*ellfac(ls, phi2k=True), (0,500), 'constant', constant_values=0)
+        gradp = results.get_lensed_gradient_cls(lmax=lmax, raw_cl=True, CMB_unit='muK', 
+                                                clpp=cphi_pad)
         ctt_unlensed = gradp[:lmax+1,0]
     # Compute noise spectrum
     ntt = (w/r2am)**2.*np.exp((b/r2am / np.sqrt(8.*np.log(2)))**2.*ls**2.)
