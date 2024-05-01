@@ -221,7 +221,7 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, 
+def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, fCl=None, 
     dl1=75, dl2=100, useMC=True, useC=True):
     """Return the normalization AL and expected Psi_L for the given spectra.
 
@@ -233,7 +233,7 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
     Parameters
     ----------
     uCl: 1d-array
-        A fiducial unlensed CMB temperature power spectrum.
+        The expected unlensed CMB temperature power spectrum.
     tCl: 1d-array
         A fiducial total, observed CMB temperature power spectrum.
     Clpp: 1d-array
@@ -248,6 +248,10 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
         The upper limit to the large-scale integral, corresponding to l2.
     Lv: 1d-array
         The Lcheck values (centered in bins) at which to evaluate Al, Psi_L.
+    fCl: 1d-array, default=None
+        If given, replaces two factors of uCl with fCl. Physically, this 
+        corresponds to the filter (fCl) cosmology being different from that 
+        of the true (uCl) cosmology.
     dl1: int
         The integration step size for the l1 integral. 
         (Bigger effect on accuracy)
@@ -273,16 +277,18 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv,
 
     ALv = np.zeros(np.shape(Lv)[0])
     PsiLv = np.zeros(np.shape(Lv)[0])
+    if fCl is None:
+        fCl = uCl
 
     if useMC:
         for iL, LL in enumerate(Lv):
-            PsiLv[iL], ALv[iL] = Psi_and_A_cy_mc(LL, uCl, tCl, Clpp, l1min, l1max, 
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy_mc(LL, uCl, fCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, 200000, 1) # 200k achieves ~1% error
         ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4
     elif useC:
         for iL, LL in enumerate(Lv):
-            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, tCl, Clpp, l1min, l1max, 
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, fCl, tCl, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
         ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4

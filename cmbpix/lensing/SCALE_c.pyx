@@ -7,8 +7,9 @@ cimport numpy as np
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-def Psi_and_A_cy(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] Clphiphi, \
-                 int l1min, int l1max, int l2min, int l2max, int dl1, int dl2):
+def Psi_and_A_cy(int L, double[:] ClTTunlensed, double[:] ClTTfiducial, \
+                 double[:] ClTTtotal, double[:] Clphiphi, int l1min, \
+                 int l1max, int l2min, int l2max, int dl1, int dl2):
     
     cdef int l1x
     cdef int l1y
@@ -66,8 +67,8 @@ def Psi_and_A_cy(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] C
 
                             integrand = 2. \
                                 * 1./(ClTTtotal[modl1] * ClTTtotal[modLminusl1]) \
-                                * (ClTTunlensed[modl2]*ClTTunlensed[modl2]/ClTTtotal[modl2]) \
-                                * (ClTTunlensed[modLminusl2]*ClTTunlensed[modLminusl2]/ClTTtotal[modLminusl2]) \
+                                * (ClTTunlensed[modl2]*ClTTfiducial[modl2]/ClTTtotal[modl2]) \
+                                * (ClTTunlensed[modLminusl2]*ClTTfiducial[modLminusl2]/ClTTtotal[modLminusl2]) \
                                 * l1dotl1minusL * l2dotl2minusl1 * Lminusl2dotl1minusl2 * l2dotl2minusL
                             
                             AL += integrand
@@ -83,8 +84,9 @@ def Psi_and_A_cy(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] C
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-def Psi_and_A_cy_mc(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] Clphiphi, \
-                 int l1min, int l1max, int l2min, int l2max, int n_samples, int dl=1):
+def Psi_and_A_cy_mc(int L, double[:] ClTTunlensed, double[:] ClTTfiducial, \
+                    double[:] ClTTtotal, double[:] Clphiphi, int l1min, \
+                    int l1max, int l2min, int l2max, int n_samples, int dl=1):
     
     cdef int l1x
     cdef int l1y
@@ -144,8 +146,8 @@ def Psi_and_A_cy_mc(int L, double[:] ClTTunlensed, double[:] ClTTtotal, double[:
                 modl1minusl2 = <int> (((l1x-l2x)*(l1x-l2x) + (l1y-l2y)*(l1y-l2y))**(0.5))
                 integrand = 2. \
                     * 1./(ClTTtotal[modl1] * ClTTtotal[modLminusl1]) \
-                    * (ClTTunlensed[modl2]*ClTTunlensed[modl2]/ClTTtotal[modl2]) \
-                    * (ClTTunlensed[modLminusl2]*ClTTunlensed[modLminusl2]/ClTTtotal[modLminusl2]) \
+                    * (ClTTunlensed[modl2]*ClTTfiducial[modl2]/ClTTtotal[modl2]) \
+                    * (ClTTunlensed[modLminusl2]*ClTTfiducial[modLminusl2]/ClTTtotal[modLminusl2]) \
                     * l1dotl1minusL * l2dotl2minusl1 * Lminusl2dotl1minusl2 * l2dotl2minusL
                 AL += integrand
                 integral += integrand*Clphiphi[modl1minusl2]
