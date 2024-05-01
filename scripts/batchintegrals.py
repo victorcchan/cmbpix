@@ -1,6 +1,6 @@
 import numpy as np
 from cmbpix.utils import *
-from cmbpix.lensing import SCALE
+from cmbpix.lensing.SCALE import CalcBiasExp
 from cmbpix.lensing.qe import N1Kesden
 from pytempura import get_norms
 import argparse
@@ -108,8 +108,8 @@ for i, samps in enumerate(lhs):
     #                               l2min=0, l2max=3000, Lv=Lv, useMC=True)
     ## Assuming a single filtering based on fiducial cosmology
     ## cphi and uCl need to change with cosmology; latter due to trispectrum changes
-    ALv, CLv = SCALE.CalcBiasExp(ctt_unlensed0, ctt_lensed0+ntt0, cphi, fCl=uCl, l1min=l1min, l1max=l1max, 
-                                  l2min=0, l2max=3000, Lv=Lv, useMC=True)
+    ALv, CLv = CalcBiasExp(ctt_unlensed0, ctt_lensed0+ntt0, cphi, fCl=uCl, l1min=l1min, l1max=l1max, 
+                           l2min=0, l2max=3000, Lv=Lv, useMC=True)
     CLvs[i,:] = CLv
     ALvs[i,:] = ALv
     
