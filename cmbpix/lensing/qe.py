@@ -31,7 +31,7 @@ def N0_bias_integral(l1xv, l1yv, Lv, ClTTunlensed, ClTTtotal, l1min = 30, l1max 
     
     return np.sum(integrand, axis=(-2,-1))
 
-def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0, version=0):
+def N1Kesden(Ls, uCl, tCl, Clpp, fCl=None, lmin=2, lmax=3000, dl=100, n_samps=0, version=0):
     """
     Compute the N1 lensing bias for the power spectrum of the lensing potential
     using the Kesden et al. (2002) estimator.
@@ -41,11 +41,17 @@ def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0, version=0
     Ls : array_like
         Multipoles at which to compute the lensing bias.
     uCl : array_like
-        Power spectrum of the lensed temperature field.
+        Power spectrum of the lensed temperature field. (often TgradT power)
     tCl : array_like
         Power spectrum of the observed temperature field: T+noise+fg.
     Clpp : array_like
         Power spectrum of the lensing potential.
+    fCl : array_like, default=None
+        If given, replaces instances of uCl that represent the filters with fCl. 
+        Physically, this corresponds to situations where the fidicual model (fCl) 
+        in the filters is different from the `true' model (uCl) which dictates 
+        the oberved trispectrum. The total observed tCl should correspond with fCl, 
+        and Clpp should correspond with uCl in this scenario.
     lmin : int, default=2
         Minimum multipole of the QE filters.
     lmax : int, default=3000
@@ -62,15 +68,17 @@ def N1Kesden(Ls, uCl, tCl, Clpp, lmin=2, lmax=3000, dl=100, n_samps=0, version=0
         N1 lensing bias for the power spectrum of the lensing potential.
     """
     N1 = np.zeros(np.size(Ls))
+    if fCl is None:
+        fCl = uCl
     if version == 0:
         N1func = N1_bias_integral_cy_Kesden
     elif version == 1 and n_samps > 0:
         N1func = N1_bias_integral_cy_Kesden_mc
-    elif version == 2:
-        N1func = N1_bias_integral_cy_Hanson
+    # elif version == 2:
+    #     N1func = N1_bias_integral_cy_Hanson
     for iL, LL in enumerate(Ls):
         if n_samps > 0:
-            N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl, n_samps)
+            N1[iL] = N1func(LL, uCl, fCl, tCl, Clpp, lmin, lmax, dl, n_samps)
         else:
-            N1[iL] = N1func(LL, uCl, tCl, Clpp, lmin, lmax, dl)
+            N1[iL] = N1func(LL, uCl, fCl, tCl, Clpp, lmin, lmax, dl)
     return N1 / ((2.0*np.pi)**4)

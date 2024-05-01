@@ -7,7 +7,9 @@ cimport numpy as np
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-def N1_bias_integral_cy_Kesden(int LL, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] Clphiphi, int lmin, int lmax, int dl):
+def N1_bias_integral_cy_Kesden(int LL, double[:] ClTTunlensed, \
+                               double[:] ClTTfiducial, double[:] ClTTtotal, \
+                               double[:] Clphiphi, int lmin, int lmax, int dl):
     
     cdef int l1x
     cdef int l1y
@@ -82,9 +84,9 @@ def N1_bias_integral_cy_Kesden(int LL, double[:] ClTTunlensed, double[:] ClTTtot
                         integral += 0.
                     else:
                         integral += 1. \
-                            * ( Ldotl1*ClTTunlensed[modl1] + LdotLminusl1*ClTTunlensed[modLminusl1] ) \
+                            * ( Ldotl1*ClTTfiducial[modl1] + LdotLminusl1*ClTTfiducial[modLminusl1] ) \
                             * 1./(2. * ClTTtotal[modl1] * ClTTtotal[modLminusl1]) \
-                            * ( Ldotl2*ClTTunlensed[modl2] + LdotLminusl2*ClTTunlensed[modLminusl2] ) \
+                            * ( Ldotl2*ClTTfiducial[modl2] + LdotLminusl2*ClTTfiducial[modLminusl2] ) \
                             * 1./(2. * ClTTtotal[modl2] * ClTTtotal[modLminusl2]) \
                             * ( Clphiphi[modl1minusl2] \
                             * ( -l1dotl2minusl1*ClTTunlensed[modl1] + l2dotl2minusl1*ClTTunlensed[modl2] ) \
@@ -100,7 +102,10 @@ def N1_bias_integral_cy_Kesden(int LL, double[:] ClTTunlensed, double[:] ClTTtot
 @cython.boundscheck(False)
 @cython.wraparound(False)
 @cython.cdivision(True)
-def N1_bias_integral_cy_Kesden_mc(int LL, double[:] ClTTunlensed, double[:] ClTTtotal, double[:] Clphiphi, int lmin, int lmax, int dl, int n_samples):
+def N1_bias_integral_cy_Kesden_mc(int LL, double[:] ClTTunlensed, \
+                                  double[:] ClTTfiducial, double[:] ClTTtotal, \
+                                  double[:] Clphiphi, int lmin, int lmax, \
+                                  int dl, int n_samples):
     
     cdef int l1x
     cdef int l1y
@@ -193,9 +198,9 @@ def N1_bias_integral_cy_Kesden_mc(int LL, double[:] ClTTunlensed, double[:] ClTT
                 l1minusLplusl2dotl2 = (l1x-L+l2x)*l2x + (l1y+l2y)*l2y
 
                 integral += 1. \
-                    * ( Ldotl1*ClTTunlensed[modl1] + LdotLminusl1*ClTTunlensed[modLminusl1] ) \
+                    * ( Ldotl1*ClTTfiducial[modl1] + LdotLminusl1*ClTTfiducial[modLminusl1] ) \
                     * 1./(2. * ClTTtotal[modl1] * ClTTtotal[modLminusl1]) \
-                    * ( Ldotl2*ClTTunlensed[modl2] + LdotLminusl2*ClTTunlensed[modLminusl2] ) \
+                    * ( Ldotl2*ClTTfiducial[modl2] + LdotLminusl2*ClTTfiducial[modLminusl2] ) \
                     * 1./(2. * ClTTtotal[modl2] * ClTTtotal[modLminusl2]) \
                     * ( Clphiphi[modl1minusl2] \
                     * ( -l1dotl2minusl1*ClTTunlensed[modl1] + l2dotl2minusl1*ClTTunlensed[modl2] ) \
