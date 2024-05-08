@@ -55,6 +55,12 @@ fnend = '.npz'
 lhs = np.load(lhdir+'LH8192_12p_{}.npy'.format(Nj))
 print('Loaded LH8192_12p_{}.npy'.format(Nj), flush=True)
 
+pars = np.zeros(lhs.shape)
+lCls = np.zeros((lhs.shape[0], ls.size))
+cphis = np.zeros((lhs.shape[0], ls.size))
+CLvs = np.zeros((lhs.shape[0], Lv.size))
+ALvs = np.zeros((lhs.shape[0], Lv.size))
+
 wfac = 1.5 # Factor to widen the 3-sigma range of each parameter by
 prs = dict(H0=[67.36, wfac*0.54], 
            ombh2=[0.02237, wfac*0.00015], 
@@ -65,11 +71,14 @@ prs = dict(H0=[67.36, wfac*0.54],
            mnu=[0.09, wfac*0.02], 
           )
 if doSuppress:
+    # Add 3 parameters for lensing suppression
     prs.update(dict(L0=[16000, 4000],# L position of Alens suppression ~4k,16k
                     kLens=[-6.1, 1.04], # Steepness of Alens suppression ~log (1e-4,5e-2)
                     Amax=[0., 1./3.], # 0 for no Alens, 1 for full Alens at high L
                     ))
     fnend = '_wSuppress' + fnend
+else:
+    pars = pars[:,:-3] # Remove 3 dims corresponding to lensing suppression
 prs.update(dict(dl1=[2000, 400], # [2000, 500] for 500 to 3500
                 l1m=[8000, 1200],  # [7000, 1000] for 4000 to 10000
                 ))
@@ -78,12 +87,6 @@ ks = list(prs.keys())
 ## Need power spectra at fiducial cosmology
 ls, ctt_unlensed0, ctt_lensed0, ntt0, cphiphi0 = getPS()
 Lv = np.arange(2002)
-
-pars = np.zeros(lhs.shape)
-lCls = np.zeros((lhs.shape[0], ls.size))
-cphis = np.zeros((lhs.shape[0], ls.size))
-CLvs = np.zeros((lhs.shape[0], Lv.size))
-ALvs = np.zeros((lhs.shape[0], Lv.size))
 
 # QE normalization at fiducial cosmology
 if doQE:
