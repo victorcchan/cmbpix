@@ -105,6 +105,8 @@ for i, samps in enumerate(lhs):
     if i / lhs.shape[0] > comp/100:
         print('Completed {}%'.format(comp), flush=True)
         comp += 1
+    if not doSuppress:
+        samps = samps[:-3]
     for j, s in enumerate(samps):
         pr = pRange(*prs[ks[j]])
         pars[i,j] = sampleParam(pr, s)
