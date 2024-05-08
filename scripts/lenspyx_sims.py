@@ -38,6 +38,10 @@ parser.add_argument("--qe",
     required=False, 
     action="store_true", 
     help="If used, run QE and save with outputs")
+parser.add_argument("--suppress", 
+    required=False, 
+    action="store_true", 
+    help="If used, add 3 lensing suppression parameters to the model")
 args = parser.parse_args()
 Nsim = args.Nsim
 Nj = args.Njob
@@ -46,6 +50,7 @@ l1max = np.array(args.l1max, dtype=int)
 l1minstr = ','.join(l1min.astype(str))
 l1maxstr = ','.join(l1max.astype(str))
 doQE = args.qe
+doSuppress = args.suppress
 
 print("Script initiated, running", Nsim, "sims", flush=True)
 
@@ -173,13 +178,19 @@ print("Generating power spectra", flush=True)
 # ctt_lensed[:2] = 1e-20
 # cphiphi[:2] = 1e-20
 # ctt_total = ctt_lensed + ntt
-ls, ctt_unlensed, ctt_lensed, ntt, cphiphi = getPS(lmax=35000)
+if doSuppress:
+    ls, ctt_unlensed, ctt_lensed, ntt, cphiphi = getPS(lmax=35000, L0=10000, kLens=1e-3, Amax=0.25)
+else:
+    ls, ctt_unlensed, ctt_lensed, ntt, cphiphi = getPS(lmax=35000)
 ctt_total = ctt_lensed + ntt
 print("Power spectra generated", flush=True)
 
 if doQE:
     print("Preparing QE", flush=True)
-    l0, ctt_response, ctt_lens, ntt_lens, cphirec = getPS(lmax=8000, lensresponse=True)
+    if doSuppress:
+        l0, ctt_response, ctt_lens, ntt_lens, cphirec = getPS(lmax=8000, L0=10000, kLens=1e-3, Amax=0.25, lensresponse=True)
+    else:
+        l0, ctt_response, ctt_lens, ntt_lens, cphirec = getPS(lmax=8000, lensresponse=True)
     ucls, tcls = build_cl_dicts(ctt_response, ctt_lens+ntt_lens, cphirec * (l0*(l0+1)/2.)**2)
     ALs = get_norms(['TT'],ucls,ucls,tcls,lmin,lmax,k_ellmax=mlmax)
     N0p = ALs['TT'][0]
