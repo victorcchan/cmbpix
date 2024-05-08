@@ -148,7 +148,11 @@ if doQE:
             
         return [talm,ealm,balm]
 
-fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+'_Njob'+str(Nj)+'.npz'
+if doSuppress:
+    fn_sup = '_wSuppression'
+else:
+    fn_sup = ''
+fn_suff = '_Nsim'+str(Nsim)+'_l1'+l1minstr+'-'+l1maxstr+fn_sup+'_Njob'+str(Nj)+'.npz'
 
 ## This generates the power spectra for the lensed and unlensed CMB
 print("Generating power spectra", flush=True)
