@@ -50,6 +50,11 @@ def build_cl_dicts(ucl, tcl, cphi):
             'BB': tcl, 'TE': tcl}
     return ucls, tcls
 
+lhdir = '/home/p/pen/victorc/1501/CLGK/LH8192/' # 
+fnend = '.npz'
+lhs = np.load(lhdir+'LH8192_12p_{}.npy'.format(Nj))
+print('Loaded LH8192_12p_{}.npy'.format(Nj), flush=True)
+
 wfac = 1.5 # Factor to widen the 3-sigma range of each parameter by
 prs = dict(H0=[67.36, wfac*0.54], 
            ombh2=[0.02237, wfac*0.00015], 
@@ -64,14 +69,11 @@ if doSuppress:
                     kLens=[-6.1, 1.04], # Steepness of Alens suppression ~log (1e-4,5e-2)
                     Amax=[0., 1./3.], # 0 for no Alens, 1 for full Alens at high L
                     ))
+    fnend = '_wSuppress' + fnend
 prs.update(dict(dl1=[2000, 400], # [2000, 500] for 500 to 3500
                 l1m=[8000, 1200],  # [7000, 1000] for 4000 to 10000
                 ))
 ks = list(prs.keys())
-
-lhdir = '/home/p/pen/victorc/1501/CLGK/LH8192/' # 
-lhs = np.load(lhdir+'LH8192_12p_{}.npy'.format(Nj))
-print('Loaded LH8192_12p_{}.npy'.format(Nj), flush=True)
 
 ## Need power spectra at fiducial cosmology
 ls, ctt_unlensed0, ctt_lensed0, ntt0, cphiphi0 = getPS()
@@ -96,6 +98,7 @@ if doQE:
     N0k_fid = (Ls*(Ls+1)/2.)**2 * N0p_fid
     ALqs = np.zeros((lhs.shape[0], Lv.size))
     N1s = np.zeros((lhs.shape[0], Lv.size))
+    fnend = '_wQE' + fnend
 
 comp = 0
 for i, samps in enumerate(lhs):
@@ -131,5 +134,5 @@ for i, samps in enumerate(lhs):
         N1s[i,:] = N1Kesden(Lv, uCl=rClq, tCl=ctt_lens+ntt_lens, Clpp=cphiq, fCl=ctt_response, 
                             lmin=lmin, lmax=lmax, dl=1, n_samps=200000, version=1)
 
-np.savez('batchIntegrals_12pars_{}.npz'.format(Nj), pars=pars, lCls=lCls, 
+np.savez('batchIntegrals_12pars_{}'.format(Nj) + fnend, pars=pars, lCls=lCls, 
          cphis=cphis, CLvs=CLvs, ALvs=ALvs, ALqs=ALqs, N1s=N1s)
