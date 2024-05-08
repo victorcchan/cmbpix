@@ -383,7 +383,7 @@ def getPS(H0=67.5, ombh2=0.022, omch2=0.122,
     ctt_unlensed = powers['unlensed_scalar'][:lmax+1,0]/ellfac(ls)
     cphiphi = powers['lens_potential'][:lmax+1,0]/ellfac(ls, phi2k=True)
     ## CAMB outputs l(l+1)/(2pi) * C_l^{dd} by default, need to rescale to C_l^{phiphi}
-    if L0 is not None and kLens is not None:
+    if L0 is not None and kLens is not None and Amax != 0:
         ALens = Asuppress(lmax, L0, kLens, Amax)
         partp = results.get_partially_lensed_cls(Alens=ALens, raw_cl=True, CMB_unit='muK')
         ctt_lensed = partp[:lmax+1,0]
