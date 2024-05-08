@@ -55,6 +55,10 @@ fnend = '.npz'
 lhs = np.load(lhdir+'LH8192_12p_{}.npy'.format(Nj))
 print('Loaded LH8192_12p_{}.npy'.format(Nj), flush=True)
 
+## Need power spectra at fiducial cosmology
+ls, ctt_unlensed0, ctt_lensed0, ntt0, cphiphi0 = getPS()
+Lv = np.arange(2002)
+
 pars = np.zeros(lhs.shape)
 lCls = np.zeros((lhs.shape[0], ls.size))
 cphis = np.zeros((lhs.shape[0], ls.size))
@@ -83,10 +87,6 @@ prs.update(dict(dl1=[2000, 400], # [2000, 500] for 500 to 3500
                 l1m=[8000, 1200],  # [7000, 1000] for 4000 to 10000
                 ))
 ks = list(prs.keys())
-
-## Need power spectra at fiducial cosmology
-ls, ctt_unlensed0, ctt_lensed0, ntt0, cphiphi0 = getPS()
-Lv = np.arange(2002)
 
 # QE normalization at fiducial cosmology
 if doQE:
