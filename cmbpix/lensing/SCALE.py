@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import healpy as hp
 from pixell import enmap, utils as putils
 #from cmbpix.utils import *
 from orphics.maps import binned_power, FourierCalc
@@ -7,6 +8,10 @@ from orphics.stats import bin2D
 import symlens as s
 from scipy.interpolate import CubicSpline
 from cmbpix.lensing.SCALE_c import Psi_and_A_cy, Psi_and_A_cy_mc
+from cmbpix.utils import simplebin
+from lenspyx.utils_hp import synalm, almxfl, alm2cl, alm_copy
+from lenspyx import get_geom
+import os
 
 def ApplyFilter(map_in, Fl):
     return enmap.ifft(enmap.fft(map_in)*Fl).real
@@ -34,6 +39,32 @@ def InvVarFilter(map_in, ells, Cls, Nls, lmin, lmax, grad=False):
         return ApplyFilter(map_in, 1j*fl*ly), ApplyFilter(map_in, 1j*fl*lx)
     else:
         return ApplyFilter(map_in, fl)
+    
+def WienerFull(alm_in, ells, uCls, lCls, Nls, lmin, lmax, geom, grad=False):
+    ltot = ells.size - 1
+    LP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
+        np.arange(1, ltot + 2)) * uCls[:ltot+1] / (lCls+Nls)[:ltot+1]
+    LP[(ells > lmax) | (ells < lmin)] = 0.
+    tlm_lp = almxfl(alm_in, LP, None, False)
+    if grad:
+        lam = geom.alm2map_spin([tlm_lp, tlm_lp*0.0], spin=1, 
+                                lmax=ltot, mmax=ltot, nthreads=os.cpu_count())
+        return geom.map2alm(lam[0]**2 + lam[1]**2, ltot, ltot, nthreads=os.cpu_count())
+    else:
+        return tlm_lp
+    
+def InvVarFull(alm_in, ells, Cls, Nls, lmin, lmax, geom, grad=False):
+    ltot = ells.size - 1
+    HP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
+        np.arange(1, ltot + 2)) / (Cls+Nls)[:ltot+1]
+    HP[(ells > lmax) | (ells < lmin)] = 0.
+    tlm_hp = almxfl(alm_in, HP, None, False)
+    if grad:
+        sig = geom.alm2map_spin([tlm_hp, tlm_hp*0.0], spin=1, 
+                                lmax=ltot, mmax=ltot, nthreads=os.cpu_count())
+        return geom.map2alm(sig[0]**2 + sig[1]**2, ltot, ltot, nthreads=os.cpu_count())
+    else:
+        return tlm_hp
     
 def CalcBias(shape, wcs, ells, ldT, lmin, lmax, lbin, lCls, Nls, w, sg, Clpp, plots=False):
     # shape,wcs = enmap.geometry(shape=(side,side),res=res*putils.arcmin,pos=(0,0))
@@ -221,8 +252,8 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, fCl=None, 
-    dl1=75, dl2=100, useMC=True, useC=True):
+def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None, 
+                fCl=None, dl1=75, dl2=100, useMC=True, useC=True):
     """Return the normalization AL and expected Psi_L for the given spectra.
 
     Return the numerically integrated normalization factors AL as well as 
@@ -313,12 +344,85 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, fCl=None,
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*ALv[iL]
     return ALv, PsiLv
 
-def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
-           DLv=50, uCl=None, lCl=None, Nl=None, Clpp=None, w=0., b=0., 
-           compute_bias=False):
-    """Return the SCALE cross-spectrum Psi_Lcheck for the given map_in.
-
+def SCALE(map_in, v='flat', map_delens=None, l1min=6000, l1max=10000, 
+          l2min=0, l2max=3000, DLv=50, uCl=None, lCl=None, Nl=None, 
+          Clpp=None, w=0., b=0., compute_bias=False):
+    """Return the SCALE cross-spectrum for the given map_in.
+    
     Perform the SCALE estimator for small-scale CMB lensing on map_in. 
+    This calls either the flat-sky or curved-sky version of the estimator 
+    depending on the specified v parameter.
+
+    Parameters
+    ----------
+    map_in: nd_map (pixell.enmap)
+        The CMB map to apply the SCALE method to.
+    v: string, default='flat'
+        The version of the SCALE method to use. Options are 'flat' or 'full'.
+    map_delens: nd_map (pixell.enmap), default=None
+        A delensed or unlensed version of map_in. If given, this map is 
+        used to compute the lambda (corresponding to large-scales) map.
+    l1min: int, default=6000
+        The lower limit to the high-pass filter, corrsponding to l1.
+    l1max: int, default=10000
+        The upper limit to the high-pass filter, corresponding to l1.
+    l2min: int, default=0
+        The lower limit to the low-pass filter, corresponding to l2.
+    l2max: int, default=3000
+        The upper limit to the low-pass filter, corresponding to l2.
+    DLv: int, default=50
+        The size of Lcheck bins in the output.
+    uCl: 1d-array, default=None
+        A fiducial unlensed CMB temperature power spectrum for filtering.
+        If None, no filter is applied.
+    lCl: 1d-array, default=None
+        A fiducial lensed CMB temperature power specturm for filtering.
+        If None, no filter is applied.
+    Nl: 1d-array, default=None
+        A fiducial CMB temperature noise spectrum for filtering.
+        If None, a set of Nls are computed with w, sg.
+    Clpp: 1d-array, default=None
+        A fiducial lensing potential (phiphi) power spectrum. Required if 
+        compute_bias=True.
+    w: float, default=0.
+        The white-noise level (in uK-arcmin) for computation of Nl if no 
+        Nls are given.
+    b: float, default=0.
+        The beam FWHM (in arcmin) for computation of Nl if no Nls are 
+        given.
+    compute_bias: bool, default=False
+        If True, return also the numerically computed normalization factors 
+        A_Lcheck as well as the expected Psi_Lcheck spectrum. This option 
+        requires inputs for uCl, lCl, and Clpp.
+    
+    Returns
+    -------
+    Lv: 1d-array
+        The centers of the Lcheck bins (set by DLv) of the other outputs.
+    CLvls: 1d-array
+        The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
+    ALv: 1d-array
+        The normalization for CLls such that Psi_Lcheck = AL*CLls. 
+        Only returned if compute_bias=True.
+    PsiLv: 1d-array
+        The expected theory values for Psi_Lcheck at the same each bin center.
+        Only returned if compute_bias=True.
+    """
+    if v == 'flat':
+        SCALE_flat(map_in, map_delens, l1min, l1max, l2min, l2max, DLv,
+                   uCl, lCl, Nl, Clpp, w, b, compute_bias)
+    elif v == 'full':
+        SCALE_full(map_in, l1min, l1max, l2min, l2max, DLv,
+                   uCl, lCl, Nl, Clpp, w, b, compute_bias)
+    else:
+        raise ValueError("Invalid version parameter. Choose 'flat' or 'full'.")
+
+def SCALE_flat(map_in, map_delens=None, l1min=6000, l1max=10000, 
+               l2min=0, l2max=3000, DLv=50, uCl=None, lCl=None, Nl=None, 
+               Clpp=None, w=0., b=0., compute_bias=False):
+    """Return the SCALE cross-spectrum for the given flat-sky map_in.
+
+    Perform the SCALE estimator for small-scale CMB lensing on map_in (flat). 
     In general, this function pre-processes map_in according to the other 
     parameters in two different ways, and computes the cross-spectrum of 
     these two products. Multipole limits for filtering are set by l1min, 
@@ -407,6 +511,97 @@ def SCALE(map_in, map_delens=None, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         return Lv, CLvls, ALv, PsiLv
     else:
         return Lv, CLvls, None, None
+
+def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
+               DLv=71, uCl=None, lCl=None, Nl=None, Clpp=None, 
+               w=0., b=0., compute_bias=False, llmax=12000, Lvmax=2002):
+    """Return the SCALE cross-spectrum for the given map_in (HEALPix).
+
+    Perform the SCALE estimator for small-scale CMB lensing on map_in (full). 
+    In general, this function pre-processes map_in according to the other 
+    parameters in two different ways, and computes the cross-spectrum of 
+    these two products. Multipole limits for filtering are set by l1min, 
+    l1max, l2min, and l2max. Options are available to provide fiducial 
+    power spectra for filtering. Also numerically computes the normalization 
+    factor A_Lcheck and the expected Psi_Lcheck from theory if compute_bias 
+    is selected.
+
+    Parameters
+    ----------
+    map_in: nd_map (HEALPix map)
+        The _flat-sky_ CMB map to apply the SCALE method to.
+    l1min: int, default=6000
+        The lower limit to the high-pass filter, corrsponding to l1.
+    l1max: int, default=10000
+        The upper limit to the high-pass filter, corresponding to l1.
+    l2min: int, default=0
+        The lower limit to the low-pass filter, corresponding to l2.
+    l2max: int, default=3000
+        The upper limit to the low-pass filter, corresponding to l2.
+    DLv: int, default=71
+        The size of Lcheck bins in the output.
+    uCl: 1d-array, default=None
+        A fiducial unlensed CMB temperature power spectrum for filtering.
+        If None, no filter is applied.
+    lCl: 1d-array, default=None
+        A fiducial lensed CMB temperature power specturm for filtering.
+        If None, no filter is applied.
+    Nl: 1d-array, default=None
+        A fiducial CMB temperature noise spectrum for filtering.
+        If None, a set of Nls are computed with w, sg.
+    Clpp: 1d-array, default=None
+        A fiducial lensing potential (phiphi) power spectrum. Required if 
+        compute_bias=True.
+    w: float, default=0.
+        The white-noise level (in uK-arcmin) for computation of Nl if no 
+        Nls are given.
+    b: float, default=0.
+        The beam FWHM (in arcmin) for computation of Nl if no Nls are 
+        given.
+    compute_bias: bool, default=False
+        If True, return also the numerically computed normalization factors 
+        A_Lcheck as well as the expected Psi_Lcheck spectrum. This option 
+        requires inputs for uCl, lCl, and Clpp.
+    llmax: int, default=12000
+        The maximum multipole for the spherical harmonic transforms.
+    Lvmax: int, default=2002
+        The maximum multipole for the outputs.
+    
+    Returns
+    -------
+    Lv: 1d-array
+        The centers of the Lcheck bins (set by DLv) of the other outputs.
+    CLvls: 1d-array
+        The un-normalized C_Lcheck^{lambda,sigma} cross-spectrum of map_in.
+    ALv: 1d-array
+        The normalization for CLls such that Psi_Lcheck = AL*CLls. 
+        Only returned if compute_bias=True.
+    PsiLv: 1d-array
+        The expected theory values for Psi_Lcheck at the same each bin center.
+        Only returned if compute_bias=True.
+    """
+    if uCl is None:
+        uCl = np.ones(l1max)
+    if lCl is None:
+        lCl = np.ones(l1max)
+    ell = np.arange(len(lCl), dtype=np.float64)
+    if Nl is None:
+        Nl = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
+    geom_info = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
+    geom = get_geom(geom_info)
+    tlm = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+    ell = np.arange(llmax+1)
+    lp_lm = WienerFull(tlm, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True, geom=geom)
+    hp_lm = InvVarFull(tlm, ell, lCl, Nl, lmin=l1min, lmax=l1max, grad=True, geom=geom)
+    Lv = np.arange(2, Lvmax)
+    CLv = simplebin(alm2cl(hp_lm, lp_lm, llmax, llmax, llmax)[2:Lvmax], DLv)
+    if compute_bias:
+        ALv, PsiLv = CalcBiasExp(uCl, lCl+Nl, Clpp, l1min, l1max, l2min, l2max, Lv)
+        ALv = simplebin(ALv, DLv)
+        PsiLv = simplebin(PsiLv, DLv)
+        return simplebin(Lv), CLv, ALv, PsiLv
+    else:
+        return simplebin(Lv), CLv, None, None
     
 def SCALEerror(Lv, CLv, ALv, fsky=1., dLv=1., normed=False):
     """Return the minimum expected variance per mode of the SCALE spectrum.
