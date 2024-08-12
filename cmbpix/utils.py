@@ -91,6 +91,32 @@ def dcltt(ell, cltt, fsky=1., dell=1.):
     """
     return np.sqrt(2 / ((2*ell+1.)*dell*fsky)) * cltt
 
+def simplebin(spec, dl=1):
+    """Return binned spectrum with bin width dl.
+
+    Parameters
+    ----------
+    spec : array_like
+        Input spectrum, either [nl] or [ns, nl].
+        ns = number of spectra, nl = number of multipoles.
+    dl : int, optional
+        Bin width.
+    lmax : int, optional
+        Maximum multipole to include.
+
+    Returns
+    -------
+    binspec : array_like
+        Binned spectrum.
+    """
+    nl = spec.shape[-1] // dl
+    lmax = nl * dl
+    if len(spec.shape) == 1:
+        return spec[:lmax].reshape((nl, dl)).mean(axis=1)
+    else:
+        nspec = spec.shape[0]
+        return spec[:, :lmax].reshape((nspec, nl, dl)).mean(axis=2)
+
 def patches(ind, NSIDEin, NSIDEout, nest=False):
     """Daughter pixel indices in a low resolution HEALPix patch.
 
