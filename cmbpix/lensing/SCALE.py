@@ -17,7 +17,7 @@ def ApplyFilter(map_in, Fl):
     return enmap.ifft(enmap.fft(map_in)*Fl).real
 
 def WienerFilter(map_in, ells, uCls, lCls, Nls, lmin, lmax, grad=False):
-    cs = CubicSpline(ells, uCls / (lCls + Nls))
+    cs = CubicSpline(ells, uCls / (lCls+Nls))
     lmap = map_in.modlmap()
     fl = cs(lmap)
     fl[0,0] = 0.
@@ -29,7 +29,7 @@ def WienerFilter(map_in, ells, uCls, lCls, Nls, lmin, lmax, grad=False):
         return ApplyFilter(map_in, fl)
 
 def InvVarFilter(map_in, ells, Cls, Nls, lmin, lmax, grad=False):
-    cs = CubicSpline(ells, 1./(Cls + Nls))
+    cs = CubicSpline(ells, 1./(Cls+Nls))
     lmap = map_in.modlmap()
     fl = cs(lmap)
     fl[0,0] = 0.
@@ -40,10 +40,10 @@ def InvVarFilter(map_in, ells, Cls, Nls, lmin, lmax, grad=False):
     else:
         return ApplyFilter(map_in, fl)
     
-def WienerFull(alm_in, ells, uCls, lCls, Nls, lmin, lmax, geom, grad=False):
+def WienerFull(alm_in, ells, uCls, tCls, lmin, lmax, geom, grad=False):
     ltot = ells.size - 1
     LP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
-        np.arange(1, ltot + 2)) * uCls[:ltot+1] / (lCls+Nls)[:ltot+1]
+        np.arange(1, ltot + 2)) * uCls[:ltot+1] / (tCls)[:ltot+1]
     LP[(ells > lmax) | (ells < lmin)] = 0.
     tlm_lp = almxfl(alm_in, LP, None, False)
     if grad:
@@ -53,10 +53,10 @@ def WienerFull(alm_in, ells, uCls, lCls, Nls, lmin, lmax, geom, grad=False):
     else:
         return tlm_lp
     
-def InvVarFull(alm_in, ells, Cls, Nls, lmin, lmax, geom, grad=False):
+def InvVarFull(alm_in, ells, tCls, lmin, lmax, geom, grad=False):
     ltot = ells.size - 1
     HP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
-        np.arange(1, ltot + 2)) / (Cls+Nls)[:ltot+1]
+        np.arange(1, ltot + 2)) / (tCls)[:ltot+1]
     HP[(ells > lmax) | (ells < lmin)] = 0.
     tlm_hp = almxfl(alm_in, HP, None, False)
     if grad:
@@ -252,7 +252,7 @@ def l1integral(l1xv, l1yv, Lv, l2xv, l2yv, ClTTunlensed, ClTTtotal,
     
     return np.sum(integrand, axis=(-2,-1))
 
-def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None, 
+def CalcBiasExp(uCl, tCl1, Clpp, l1min, l1max, l2min, l2max, Lv, tCl2=None, 
                 fCl=None, dl1=75, dl2=100, useMC=True, useC=True):
     """Return the normalization AL and expected Psi_L for the given spectra.
 
@@ -265,7 +265,7 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None,
     ----------
     uCl: 1d-array
         The expected unlensed CMB temperature power spectrum.
-    tCl: 1d-array
+    tCl1: 1d-array
         A fiducial total, observed CMB temperature power spectrum.
     Clpp: 1d-array
         A fiducial lensing potential (phiphi) power spectrum.
@@ -279,6 +279,9 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None,
         The upper limit to the large-scale integral, corresponding to l2.
     Lv: 1d-array
         The Lcheck values (centered in bins) at which to evaluate Al, Psi_L.
+    tCl2: 1d-array, default=None
+        If given, replace the denominator of the large-scale Wiener filter 
+        with tCl2. Otherwise, use tCl1.
     fCl: 1d-array, default=None
         If given, replaces two factors of uCl with fCl. Physically, this 
         corresponds to the filter (fCl) cosmology being different from that 
@@ -305,21 +308,22 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None,
 
     ## Do each L individually to save on memory usage
     ## Loop is a bit slower than vectorized calculation, but memory savings is factor of nL
-
     ALv = np.zeros(np.shape(Lv)[0])
     PsiLv = np.zeros(np.shape(Lv)[0])
     if fCl is None:
         fCl = uCl
+    if tCl2 is None:
+        tCl2 = tCl1
 
     if useMC:
         for iL, LL in enumerate(Lv):
-            PsiLv[iL], ALv[iL] = Psi_and_A_cy_mc(LL, uCl, fCl, tCl, Clpp, l1min, l1max, 
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy_mc(LL, uCl, fCl, tCl1, tCl2, Clpp, l1min, l1max, 
                 l2min, l2max, 200000, 1) # 200k achieves ~1% error
         ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4
     elif useC:
         for iL, LL in enumerate(Lv):
-            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, fCl, tCl, Clpp, l1min, l1max, 
+            PsiLv[iL], ALv[iL] = Psi_and_A_cy(LL, uCl, fCl, tCl1, tCl2, Clpp, l1min, l1max, 
                 l2min, l2max, dl1, dl2)
         ALv *= (2*np.pi)**4
         PsiLv /= (2*np.pi)**4
@@ -337,10 +341,10 @@ def CalcBiasExp(uCl, tCl, Clpp, l1min, l1max, l2min, l2max, Lv, oCl=None,
         l2xv, l2yv = np.meshgrid(l2x, l2y, sparse=True)  # make sparse output arrays
         for iL, LL in enumerate(Lv):
             ALv[iL] = 1./l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-                uCl, tCl, Clphiphi = None, 
+                uCl, tCl1, Clphiphi = None, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)
             PsiLv[iL] = l1integral(l1xv, l1yv, [LL], l2xv, l2yv, 
-                uCl, tCl, Clphiphi = Clpp, 
+                uCl, tCl1, Clphiphi = Clpp, 
                 l1min = l1min, l1max = l1max, l2min = l2min, l2max = l2max)*ALv[iL]
     return ALv, PsiLv
 
@@ -409,11 +413,11 @@ def SCALE(map_in, v='flat', map_delens=None, l1min=6000, l1max=10000,
         Only returned if compute_bias=True.
     """
     if v == 'flat':
-        SCALE_flat(map_in, map_delens, l1min, l1max, l2min, l2max, DLv,
-                   uCl, lCl, Nl, Clpp, w, b, compute_bias)
+        return SCALE_flat(map_in, map_delens, l1min, l1max, l2min, l2max, DLv, 
+                          uCl, lCl, Nl, Clpp, w, b, compute_bias)
     elif v == 'full':
-        SCALE_full(map_in, l1min, l1max, l2min, l2max, DLv,
-                   uCl, lCl, Nl, Clpp, w, b, compute_bias)
+        return SCALE_full(map_in, l1min, l1max, l2min, l2max, DLv, 
+                          uCl, lCl, Nl, Clpp, w, b, compute_bias)
     else:
         raise ValueError("Invalid version parameter. Choose 'flat' or 'full'.")
 
@@ -513,8 +517,8 @@ def SCALE_flat(map_in, map_delens=None, l1min=6000, l1max=10000,
         return Lv, CLvls, None, None
 
 def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
-               DLv=71, uCl=None, lCl=None, Nl=None, Clpp=None, 
-               w=0., b=0., compute_bias=False, llmax=12000, Lvmax=2002):
+               DLv=71, uCl=None, tCl1=None, tCl2=None, Clpp=None, alm=False, 
+               nside=4096, compute_bias=False, llmax=12000, Lvmax=2002):
     """Return the SCALE cross-spectrum for the given map_in (HEALPix).
 
     Perform the SCALE estimator for small-scale CMB lensing on map_in (full). 
@@ -541,23 +545,25 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     DLv: int, default=71
         The size of Lcheck bins in the output.
     uCl: 1d-array, default=None
-        A fiducial unlensed CMB temperature power spectrum for filtering.
+        A fiducial unlensed CMB temperature power spectrum for large-scale 
+        filtering.
         If None, no filter is applied.
-    lCl: 1d-array, default=None
-        A fiducial lensed CMB temperature power specturm for filtering.
+    tCl1: 1d-array, default=None
+        A fiducial lensed CMB temperature power specturm for small-scale 
+        filtering.
         If None, no filter is applied.
-    Nl: 1d-array, default=None
-        A fiducial CMB temperature noise spectrum for filtering.
-        If None, a set of Nls are computed with w, sg.
+    tCl2: 1d-array, default=None
+        A fiducial lensed CMB temperature power specturm for large-scale 
+        filtering.
+        If None, tCl2 is taken to be tCl1.
     Clpp: 1d-array, default=None
         A fiducial lensing potential (phiphi) power spectrum. Required if 
         compute_bias=True.
-    w: float, default=0.
-        The white-noise level (in uK-arcmin) for computation of Nl if no 
-        Nls are given.
-    b: float, default=0.
-        The beam FWHM (in arcmin) for computation of Nl if no Nls are 
-        given.
+    alm: bool, default=False
+        If True, map_in is assumed to be a HEALPix alm array, and the 
+        initial map2alm step is skipped.
+    nside: int, default=4096
+        The HEALPix nside parameter for the input map. Needed if alm=True.
     compute_bias: bool, default=False
         If True, return also the numerically computed normalization factors 
         A_Lcheck as well as the expected Psi_Lcheck spectrum. This option 
@@ -582,21 +588,26 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
     """
     if uCl is None:
         uCl = np.ones(l1max)
-    if lCl is None:
-        lCl = np.ones(l1max)
-    ell = np.arange(len(lCl), dtype=np.float64)
-    if Nl is None:
-        Nl = (w*np.pi/180./60.)**2. / np.exp(-ell*(ell+1)*(b*np.pi/180./60. / np.sqrt(8.*np.log(2)))**2)
-    geom_info = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
-    geom = get_geom(geom_info)
-    tlm = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+    if tCl1 is None:
+        tCl1 = np.ones(l1max)
+    if tCl2 is None:
+        tCl2 = tCl1
+    ell = np.arange(len(uCl), dtype=np.float64)
+    if alm == False:
+        geom_info = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
+        geom = get_geom(geom_info)
+        tlm = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+    else:
+        geom_info = ('healpix', {'nside':nside}) # needed for alm functions
+        geom = get_geom(geom_info)
+        tlm = map_in
     ell = np.arange(llmax+1)
-    lp_lm = WienerFull(tlm, ell, uCl, lCl, Nl, lmin=l2min, lmax=l2max, grad=True, geom=geom)
-    hp_lm = InvVarFull(tlm, ell, lCl, Nl, lmin=l1min, lmax=l1max, grad=True, geom=geom)
+    lp_lm = WienerFull(tlm, ell, uCl, tCl2, lmin=l2min, lmax=l2max, grad=True, geom=geom)
+    hp_lm = InvVarFull(tlm, ell, tCl1, lmin=l1min, lmax=l1max, grad=True, geom=geom)
     Lv = np.arange(2, Lvmax)
     CLv = simplebin(alm2cl(hp_lm, lp_lm, llmax, llmax, llmax)[2:Lvmax], DLv)
     if compute_bias:
-        ALv, PsiLv = CalcBiasExp(uCl, lCl+Nl, Clpp, l1min, l1max, l2min, l2max, Lv)
+        ALv, PsiLv = CalcBiasExp(uCl, tCl1, Clpp, l1min, l1max, l2min, l2max, Lv, tCl2=tCl2)
         ALv = simplebin(ALv, DLv)
         PsiLv = simplebin(PsiLv, DLv)
         return simplebin(Lv), CLv, ALv, PsiLv
