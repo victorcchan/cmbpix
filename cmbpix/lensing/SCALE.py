@@ -40,29 +40,31 @@ def InvVarFilter(map_in, ells, Cls, Nls, lmin, lmax, grad=False):
     else:
         return ApplyFilter(map_in, fl)
     
-def WienerFull(alm_in, ells, uCls, tCls, lmin, lmax, geom, grad=False):
-    ltot = ells.size - 1
-    LP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
-        np.arange(1, ltot + 2)) * uCls[:ltot+1] / (tCls)[:ltot+1]
+def WienerFull(alm_in, ells, uCls, tCls, lmin, lmax, geom, grad=False, llmax=None):
+    if llmax is None:
+        llmax = ells.size - 1
+    LP = np.ones(llmax+1)*np.sqrt(np.arange(llmax+1, dtype=float) * \
+        np.arange(1, llmax + 2)) * uCls[:llmax+1] / (tCls)[:llmax+1]
     LP[(ells > lmax) | (ells < lmin)] = 0.
     tlm_lp = almxfl(alm_in, LP, None, False)
     if grad:
         lam = geom.alm2map_spin([tlm_lp, tlm_lp*0.0], spin=1, 
-                                lmax=ltot, mmax=ltot, nthreads=os.cpu_count())
-        return geom.map2alm(lam[0]**2 + lam[1]**2, ltot, ltot, nthreads=os.cpu_count())
+                                lmax=llmax, mmax=llmax, nthreads=os.cpu_count())
+        return geom.map2alm(lam[0]**2 + lam[1]**2, llmax, llmax, nthreads=os.cpu_count())
     else:
         return tlm_lp
     
-def InvVarFull(alm_in, ells, tCls, lmin, lmax, geom, grad=False):
-    ltot = ells.size - 1
-    HP = np.ones(ltot+1)*np.sqrt(np.arange(ltot+1, dtype=float) * \
-        np.arange(1, ltot + 2)) / (tCls)[:ltot+1]
+def InvVarFull(alm_in, ells, tCls, lmin, lmax, geom, grad=False, llmax=None):
+    if llmax is None:
+        llmax = ells.size - 1
+    HP = np.ones(llmax+1)*np.sqrt(np.arange(llmax+1, dtype=float) * \
+        np.arange(1, llmax + 2)) / (tCls)[:llmax+1]
     HP[(ells > lmax) | (ells < lmin)] = 0.
     tlm_hp = almxfl(alm_in, HP, None, False)
     if grad:
         sig = geom.alm2map_spin([tlm_hp, tlm_hp*0.0], spin=1, 
-                                lmax=ltot, mmax=ltot, nthreads=os.cpu_count())
-        return geom.map2alm(sig[0]**2 + sig[1]**2, ltot, ltot, nthreads=os.cpu_count())
+                                lmax=llmax, mmax=llmax, nthreads=os.cpu_count())
+        return geom.map2alm(sig[0]**2 + sig[1]**2, llmax, llmax, nthreads=os.cpu_count())
     else:
         return tlm_hp
     
@@ -518,8 +520,8 @@ def SCALE_flat(map_in, map_delens=None, l1min=6000, l1max=10000,
 
 def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
                DLv=71, uCl=None, tCl1=None, tCl2=None, Clpp=None, alm=False, 
-               nside=4096, compute_bias=False, llmax=12000, Lvmax=2002, 
-               map_in2 = None, nside2=None):
+               nside=4096, compute_bias=False, llmax1=12000, Lvmax=2002, 
+               map_in2=None, nside2=None, llmax2=None):
     """Return the SCALE cross-spectrum for the given map_in (HEALPix).
 
     Perform the SCALE estimator for small-scale CMB lensing on map_in (full). 
@@ -577,6 +579,9 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         If given, uses map_in2 as the large-scale map for the lambda filter.
     nside2: int, default=None
         The HEALPix nside parameter for the input map_in2. Defaults to nside.
+    llmax2: int, default=None
+        The maximum multipole for the spherical harmonic transforms of map_in2. 
+        Defaults to llmax1.
     
     Returns
     -------
@@ -599,16 +604,18 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         tCl2 = tCl1
     if nside2 is None:
         nside2 = nside
+    if llmax2 is None:
+        llmax2 = llmax1
     ell = np.arange(len(uCl), dtype=np.float64)
     if alm == False:
         geom_info1 = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
         geom1 = get_geom(geom_info1)
-        tlm1 = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+        tlm1 = hp.map2alm(np.copy(map_in), lmax=llmax1, mmax=llmax1)
         if map_in2 is None:
             tlm2 = np.copy(tlm1)
         else:
             geom_info2 = ('healpix', {'nside':hp.get_nside(map_in2)}) # needed for alm functions
-            tlm2 = hp.map2alm(np.copy(map_in2), lmax=llmax, mmax=llmax)
+            tlm2 = hp.map2alm(np.copy(map_in2), lmax=llmax2, mmax=llmax2)
     else:
         geom_info1 = ('healpix', {'nside':nside}) # needed for alm functions
         geom1 = get_geom(geom_info1)
@@ -619,11 +626,11 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
             tlm2 = np.copy(tlm1)
         else:
             tlm2 = map_in2
-    ell = np.arange(llmax+1)
-    lp_lm = WienerFull(tlm2, ell, uCl, tCl2, lmin=l2min, lmax=l2max, grad=True, geom=geom2)
-    hp_lm = InvVarFull(tlm1, ell, tCl1, lmin=l1min, lmax=l1max, grad=True, geom=geom1)
+    ell = np.arange(llmax2+1)
+    lp_lm = WienerFull(tlm2, ell, uCl, tCl2, lmin=l2min, lmax=l2max, grad=True, geom=geom2, llmax=llmax2)
+    hp_lm = InvVarFull(tlm1, ell, tCl1, lmin=l1min, lmax=l1max, grad=True, geom=geom1, llmax=llmax1)
     Lv = np.arange(2, Lvmax)
-    CLv = simplebin(alm2cl(hp_lm, lp_lm, llmax, llmax, llmax)[2:Lvmax], DLv)
+    CLv = simplebin(alm2cl(hp_lm, lp_lm, llmax2, llmax2, llmax2)[2:Lvmax], DLv)
     if compute_bias:
         ALv, PsiLv = CalcBiasExp(uCl, tCl1, Clpp, l1min, l1max, l2min, l2max, Lv, tCl2=tCl2)
         ALv = simplebin(ALv, DLv)
