@@ -518,7 +518,8 @@ def SCALE_flat(map_in, map_delens=None, l1min=6000, l1max=10000,
 
 def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000, 
                DLv=71, uCl=None, tCl1=None, tCl2=None, Clpp=None, alm=False, 
-               nside=4096, compute_bias=False, llmax=12000, Lvmax=2002):
+               nside=4096, compute_bias=False, llmax=12000, Lvmax=2002, 
+               map_in2 = None, nside2=None):
     """Return the SCALE cross-spectrum for the given map_in (HEALPix).
 
     Perform the SCALE estimator for small-scale CMB lensing on map_in (full). 
@@ -549,11 +550,11 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         filtering.
         If None, no filter is applied.
     tCl1: 1d-array, default=None
-        A fiducial lensed CMB temperature power specturm for small-scale 
+        A fiducial lensed CMB temperature power spectrum for small-scale 
         filtering.
         If None, no filter is applied.
     tCl2: 1d-array, default=None
-        A fiducial lensed CMB temperature power specturm for large-scale 
+        A fiducial lensed CMB temperature power spectrum for large-scale 
         filtering.
         If None, tCl2 is taken to be tCl1.
     Clpp: 1d-array, default=None
@@ -572,6 +573,10 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         The maximum multipole for the spherical harmonic transforms.
     Lvmax: int, default=2002
         The maximum multipole for the outputs.
+    map_in2: nd_map (HEALPix map), default=None
+        If given, uses map_in2 as the large-scale map for the lambda filter.
+    nside2: int, default=None
+        The HEALPix nside parameter for the input map_in2. Defaults to nside.
     
     Returns
     -------
@@ -592,18 +597,31 @@ def SCALE_full(map_in, l1min=6000, l1max=10000, l2min=0, l2max=3000,
         tCl1 = np.ones(l1max)
     if tCl2 is None:
         tCl2 = tCl1
+    if nside2 is None:
+        nside2 = nside
     ell = np.arange(len(uCl), dtype=np.float64)
     if alm == False:
-        geom_info = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
-        geom = get_geom(geom_info)
-        tlm = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+        geom_info1 = ('healpix', {'nside':hp.get_nside(map_in)}) # needed for alm functions
+        geom1 = get_geom(geom_info1)
+        tlm1 = hp.map2alm(np.copy(map_in), lmax=llmax, mmax=llmax)
+        if map_in2 is None:
+            tlm2 = np.copy(tlm1)
+        else:
+            geom_info2 = ('healpix', {'nside':hp.get_nside(map_in2)}) # needed for alm functions
+            tlm2 = hp.map2alm(np.copy(map_in2), lmax=llmax, mmax=llmax)
     else:
-        geom_info = ('healpix', {'nside':nside}) # needed for alm functions
-        geom = get_geom(geom_info)
-        tlm = map_in
+        geom_info1 = ('healpix', {'nside':nside}) # needed for alm functions
+        geom1 = get_geom(geom_info1)
+        geom_info2 = ('healpix', {'nside':nside2}) # needed for alm functions
+        geom2 = get_geom(geom_info2)
+        tlm1 = map_in
+        if map_in2 is None:
+            tlm2 = np.copy(tlm1)
+        else:
+            tlm2 = map_in2
     ell = np.arange(llmax+1)
-    lp_lm = WienerFull(tlm, ell, uCl, tCl2, lmin=l2min, lmax=l2max, grad=True, geom=geom)
-    hp_lm = InvVarFull(tlm, ell, tCl1, lmin=l1min, lmax=l1max, grad=True, geom=geom)
+    lp_lm = WienerFull(tlm2, ell, uCl, tCl2, lmin=l2min, lmax=l2max, grad=True, geom=geom2)
+    hp_lm = InvVarFull(tlm1, ell, tCl1, lmin=l1min, lmax=l1max, grad=True, geom=geom1)
     Lv = np.arange(2, Lvmax)
     CLv = simplebin(alm2cl(hp_lm, lp_lm, llmax, llmax, llmax)[2:Lvmax], DLv)
     if compute_bias:
